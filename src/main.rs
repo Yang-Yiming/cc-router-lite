@@ -44,7 +44,8 @@ fn main() {
 }
 
 fn default_config_path() -> PathBuf {
-    let mut p = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
+    let mut p = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    p.push(".config");
     p.push("ccr-lite");
     p.push("config.toml");
     p
@@ -122,7 +123,11 @@ fn cmd_export(custom_config: &Option<PathBuf>, name: &str) -> Result<(), CcrlErr
     println!("export ANTHROPIC_BASE_URL='{}'", profile.url);
     println!("export ANTHROPIC_AUTH_TOKEN='{}'", profile.auth);
     for (k, v) in &profile.env {
-        println!("export {}='{}'", k, v);
+        let s = match v {
+            serde_json::Value::String(s) => s.clone(),
+            other => other.to_string(),
+        };
+        println!("export {}='{}'", k, s);
     }
     Ok(())
 }

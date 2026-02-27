@@ -31,7 +31,7 @@ pub fn inject_profile(settings_path: &Path, profile: &Profile) -> Result<(), Ccr
     );
 
     for (k, v) in &profile.env {
-        env.insert(k.clone(), Value::String(v.clone()));
+        env.insert(k.clone(), v.clone());
     }
 
     if let Some(parent) = settings_path.parent() {

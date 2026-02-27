@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -10,7 +11,7 @@ pub struct RawProfile {
     pub url: String,
     pub auth: String,
     #[serde(default)]
-    pub env: HashMap<String, String>,
+    pub env: HashMap<String, toml::Value>,
 }
 
 pub struct Profile {
@@ -18,7 +19,7 @@ pub struct Profile {
     pub name: String,
     pub url: String,
     pub auth: String,
-    pub env: HashMap<String, String>,
+    pub env: HashMap<String, JsonValue>,
 }
 
 pub fn load_config(path: &Path) -> Result<HashMap<String, RawProfile>, CcrlError> {
@@ -43,7 +44,14 @@ pub fn resolve_profile(name: &str, raw: &RawProfile) -> Result<Profile, CcrlErro
     let auth = resolve_value(&raw.auth)?;
     let mut env = HashMap::new();
     for (k, v) in &raw.env {
-        env.insert(k.clone(), resolve_value(v)?);
+        let json_val = match v {
+            toml::Value::String(s) => JsonValue::String(resolve_value(s)?),
+            toml::Value::Integer(i) => serde_json::json!(i),
+            toml::Value::Float(f) => serde_json::json!(f),
+            toml::Value::Boolean(b) => JsonValue::Bool(*b),
+            other => JsonValue::String(other.to_string()),
+        };
+        env.insert(k.clone(), json_val);
     }
     Ok(Profile {
         name: name.to_string(),
