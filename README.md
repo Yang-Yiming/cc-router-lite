@@ -9,34 +9,45 @@ A lightweight CLI for switching between multiple Claude Code API profiles.
 - Track the active profile across sessions
 - Support `$ENV_VAR` references in config values
 
+>[!warning]
+>env vars(containing api-keys) are injected into `~/.claude/settings.json` directly, make sure this file not uploaded to git repos.
+
 ## Install
 
 ```sh
 cargo install --path .
 ```
 
+Homebrew - MacOS(Darwin)
+```sh
+brew tap yang-yiming/tap
+brew install ccrl
+```
+
 ## Config
 
 Create `~/.config/ccr-lite/config.toml`:
 
+Example: 
 ```toml
-[work]
-url = "https://api.anthropic.com"
-auth = "$ANTHROPIC_API_KEY_WORK"
+# Deepseek
+[ds]
+url = "https://api.deepseek.com/anthropic"
+auth = "$DEEPSEEK_API_KEY"
+[ds.env]
+ANTHROPIC_MODEL="deepseek-chat"
+ANTHROPIC_SMALL_FAST_MODEL="deepseek-chat"
 
-[personal]
-url = "https://api.anthropic.com"
-auth = "sk-ant-xxxx"
-
-[personal.env]
-ANTHROPIC_SMALL_FAST_MODEL = "claude-haiku-4-5-20251001"
+[kimi]
+url = "https://api.moonshot.cn/anthropic/"
+auth = "sk-xxxx"
 ```
 
 ## Usage
 
 ```sh
 # Inject a profile into ~/.claude/settings.json (persistent)
-ccrl set work
+ccrl set ds
 
 # Show the active profile
 ccrl now
@@ -46,4 +57,6 @@ ccrl list
 
 # Export env vars to the current shell (temporary)
 eval "$(ccrl personal)"
+# or
+ccrl ds
 ```
