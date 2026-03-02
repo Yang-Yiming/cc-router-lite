@@ -30,6 +30,8 @@ enum Commands {
     Now,
     /// List all profiles
     List,
+    /// Check connectivity for all profiles (or a named one)
+    Check { name: Option<String> },
     /// Shell export mode (ccrl <name>)
     #[command(external_subcommand)]
     Export(Vec<String>),
@@ -63,6 +65,7 @@ fn run(cli: Cli) -> Result<(), CcrlError> {
         Commands::Set { name } => cmd_set(&cli.config, &name),
         Commands::Now => cmd_now(),
         Commands::List => cmd_list(&cli.config),
+        Commands::Check { name } => cmd_check(&cli.config, name.as_deref()),
         Commands::Export(args) => {
             let name = args
                 .first()
@@ -122,6 +125,34 @@ fn cmd_list(custom_config: &Option<PathBuf>) -> Result<(), CcrlError> {
             println!("* {}  (active)", name);
         } else {
             println!("  {}", name);
+        }
+    }
+    Ok(())
+}
+
+fn cmd_check(custom_config: &Option<PathBuf>, name: Option<&str>) -> Result<(), CcrlError> {
+    let path = config_path(custom_config);
+    let profiles = load_config(&path)?;
+    let mut names: Vec<&String> = profiles.keys().collect();
+    names.sort();
+    for n in names {
+        if let Some(filter) = name {
+            if n != filter { continue; }
+        }
+        let raw = &profiles[n];
+        let profile = match resolve_profile(n, raw) {
+            Ok(p) => p,
+            Err(e) => { println!("[✗] {:<20} {}", n, e); continue; }
+        };
+        let url = format!("{}/v1/models", profile.url.trim_end_matches('/'));
+        let start = std::time::Instant::now();
+        match ureq::get(&url).set("x-api-key", &profile.auth).call() {
+            Ok(_) => println!("[✓] {:<20} 200 OK ({}ms)", n, start.elapsed().as_millis()),
+            Err(ureq::Error::Status(code, _)) => {
+                let label = if code == 401 { "unauthorized" } else { "error" };
+                println!("[!] {:<20} {} {}", n, code, label);
+            }
+            Err(e) => println!("[✗] {:<20} {}", n, e),
         }
     }
     Ok(())
