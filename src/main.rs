@@ -34,6 +34,8 @@ enum Commands {
     List,
     /// Check connectivity for all profiles (or a named one)
     Check { name: Option<String> },
+    /// Validate all profiles (env var resolution)
+    Validate,
     /// Generate shell completions
     Completions { shell: Shell },
     /// Shell export mode (ccrl <name>)
@@ -70,6 +72,7 @@ fn run(cli: Cli) -> Result<(), CcrlError> {
         Commands::Now => cmd_now(),
         Commands::List => cmd_list(&cli.config),
         Commands::Check { name } => cmd_check(&cli.config, name.as_deref()),
+        Commands::Validate => cmd_validate(&cli.config),
         Commands::Completions { shell } => cmd_completions(shell),
         Commands::Export(args) => {
             let name = args
@@ -159,6 +162,20 @@ fn cmd_check(custom_config: &Option<PathBuf>, name: Option<&str>) -> Result<(), 
                 println!("[!] {:<20} {} {}", n, code, label);
             }
             Err(e) => println!("[✗] {:<20} {}", n, e),
+        }
+    }
+    Ok(())
+}
+
+fn cmd_validate(custom_config: &Option<PathBuf>) -> Result<(), CcrlError> {
+    let path = config_path(custom_config);
+    let profiles = load_config(&path)?;
+    let mut names: Vec<&String> = profiles.keys().collect();
+    names.sort();
+    for name in names {
+        match resolve_profile(name, &profiles[name]) {
+            Ok(_)  => println!("[✓] {}", name),
+            Err(e) => println!("[✗] {:<20} {}", name, e),
         }
     }
     Ok(())

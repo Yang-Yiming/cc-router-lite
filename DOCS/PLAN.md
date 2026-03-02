@@ -98,7 +98,7 @@ Completes: subcommand names + profile names for `set`/`check`/`validate` args
 
 ---
 
-### Feature 4: `ccrl validate` — Profile Validation
+### Feature 4: `ccrl validate` — Profile Validation ✅
 
 **No new deps needed.**
 
