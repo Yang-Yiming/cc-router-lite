@@ -121,10 +121,11 @@ fn cmd_list(custom_config: &Option<PathBuf>) -> Result<(), CcrlError> {
     let mut names: Vec<&String> = profiles.keys().collect();
     names.sort();
     for name in names {
+        let desc = profiles[name].description.as_deref().map(|d| format!(" — {}", d)).unwrap_or_default();
         if current.as_deref() == Some(name.as_str()) {
-            println!("* {}  (active)", name);
+            println!("* {}  (active){}", name, desc);
         } else {
-            println!("  {}", name);
+            println!("  {}{}", name, desc);
         }
     }
     Ok(())

@@ -12,6 +12,7 @@ pub struct RawProfile {
     pub auth: String,
     #[serde(default)]
     pub env: HashMap<String, toml::Value>,
+    pub description: Option<String>,
 }
 
 pub struct Profile {

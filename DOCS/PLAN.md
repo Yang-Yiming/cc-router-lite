@@ -26,7 +26,8 @@
 
 ## Completed Features
 
-- [x] **Feature 1: `ccrl check`** — Connectivity check command that tests each profile's API endpoint (`/v1/models`) and reports status with timing. Usage: `ccrl check` or `ccrl check <profile-name>`.
+- [x] **Feature 1: `ccrl check`** — Connectivity check command
+- [x] **Feature 2: Notes/Description field** — Optional `description` field in profiles, shown in `ccrl list` output. that tests each profile's API endpoint (`/v1/models`) and reports status with timing. Usage: `ccrl check` or `ccrl check <profile-name>`.
 
 ## Completed Fixes
 
