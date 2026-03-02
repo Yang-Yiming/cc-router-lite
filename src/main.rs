@@ -3,10 +3,12 @@ mod error;
 mod settings;
 mod state;
 
+use std::io;
 use std::path::PathBuf;
 use std::process;
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::Shell;
 
 use crate::config::{load_config, resolve_profile};
 use crate::error::CcrlError;
@@ -32,6 +34,8 @@ enum Commands {
     List,
     /// Check connectivity for all profiles (or a named one)
     Check { name: Option<String> },
+    /// Generate shell completions
+    Completions { shell: Shell },
     /// Shell export mode (ccrl <name>)
     #[command(external_subcommand)]
     Export(Vec<String>),
@@ -66,6 +70,7 @@ fn run(cli: Cli) -> Result<(), CcrlError> {
         Commands::Now => cmd_now(),
         Commands::List => cmd_list(&cli.config),
         Commands::Check { name } => cmd_check(&cli.config, name.as_deref()),
+        Commands::Completions { shell } => cmd_completions(shell),
         Commands::Export(args) => {
             let name = args
                 .first()
@@ -156,6 +161,11 @@ fn cmd_check(custom_config: &Option<PathBuf>, name: Option<&str>) -> Result<(), 
             Err(e) => println!("[✗] {:<20} {}", n, e),
         }
     }
+    Ok(())
+}
+
+fn cmd_completions(shell: Shell) -> Result<(), CcrlError> {
+    clap_complete::generate(shell, &mut Cli::command(), "ccrl", &mut io::stdout());
     Ok(())
 }
 
