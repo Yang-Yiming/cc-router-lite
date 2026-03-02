@@ -5,7 +5,11 @@ use std::path::Path;
 use crate::config::Profile;
 use crate::error::CcrlError;
 
-pub fn inject_profile(settings_path: &Path, profile: &Profile) -> Result<(), CcrlError> {
+pub fn inject_profile(
+    settings_path: &Path,
+    profile: &Profile,
+    old_keys: &[String],
+) -> Result<(), CcrlError> {
     let mut root: Value = if settings_path.exists() {
         let content = fs::read_to_string(settings_path)?;
         serde_json::from_str(&content)?
@@ -20,6 +24,10 @@ pub fn inject_profile(settings_path: &Path, profile: &Profile) -> Result<(), Ccr
         .or_insert_with(|| Value::Object(serde_json::Map::new()))
         .as_object_mut()
         .unwrap();
+
+    for key in old_keys {
+        env.remove(key);
+    }
 
     env.insert(
         "ANTHROPIC_BASE_URL".into(),

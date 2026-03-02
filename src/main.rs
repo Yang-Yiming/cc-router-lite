@@ -83,7 +83,21 @@ fn cmd_set(custom_config: &Option<PathBuf>, name: &str) -> Result<(), CcrlError>
         .get(name)
         .ok_or_else(|| CcrlError::ProfileNotFound(name.into()))?;
     let profile = resolve_profile(name, raw)?;
-    settings::inject_profile(&settings_path(), &profile)?;
+
+    // Collect old profile's env keys for cleanup
+    let old_keys: Vec<String> = state::read_current()
+        .and_then(|old_name| profiles.get(&old_name))
+        .map(|old_raw| {
+            let mut keys = vec![
+                "ANTHROPIC_BASE_URL".to_string(),
+                "ANTHROPIC_AUTH_TOKEN".to_string(),
+            ];
+            keys.extend(old_raw.env.keys().cloned());
+            keys
+        })
+        .unwrap_or_default();
+
+    settings::inject_profile(&settings_path(), &profile, &old_keys)?;
     state::write_current(name)?;
     println!("Profile '{}' activated", name);
     Ok(())

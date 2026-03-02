@@ -24,6 +24,10 @@
 5. **settings.rs** — inject_profile
 6. **main.rs** — Cli/Commands 定义，cmd_set/cmd_now/cmd_list/cmd_export
 
+## Completed Fixes
+
+- [x] **Stale env key cleanup on profile switch** — `inject_profile()` now removes old profile's env keys before injecting new ones, using `.current` state to identify the previous profile. Old profile missing or `.current` absent gracefully skips removal.
+
 ## Design Changes from Original Requirements
 
 - 去掉 `settings_file` 配置项，settings.json 路径硬编码为 `~/.claude/settings.json`
