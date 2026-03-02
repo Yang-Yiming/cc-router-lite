@@ -8,6 +8,8 @@ A lightweight CLI for switching between multiple Claude Code API profiles.
 - Export env vars to the current shell session via `eval`
 - Track the active profile across sessions
 - Support `$ENV_VAR` references in config values
+- Validate profiles (env var resolution) without network calls
+- Check API connectivity for all profiles
 
 >[!warning]
 >env vars(containing api-keys) are injected into `~/.claude/settings.json` directly, make sure this file not uploaded to git repos.
@@ -54,6 +56,12 @@ ccrl now
 
 # List all profiles
 ccrl list
+
+# Validate all profiles (env var resolution, no network)
+ccrl validate
+
+# Check API connectivity for all profiles
+ccrl check
 
 # Export env vars to the current shell (temporary)
 eval "$(ccrl personal)"
