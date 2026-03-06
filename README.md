@@ -2,6 +2,8 @@
 
 A lightweight CLI for switching between multiple Claude Code API profiles.
 
+This project is inspired by [Claude Code Router](https://github.com/musistudio/claude-code-router), a powerful routing solution with many features. Unlike it, this project only focuses on being extremely lightweight, operating only by injecting environment variables into `~/.claude/settings.json`.
+
 ## Features
 
 - Switch profiles by injecting env vars into `~/.claude/settings.json`
@@ -64,7 +66,7 @@ ccrl validate
 ccrl check
 
 # Export env vars to the current shell (temporary)
-eval "$(ccrl personal)"
-# or
-ccrl ds
+eval "$(ccrl ds)"
 ```
+>[!note]
+>Environment variable settings (e.g., `eval "$(ccrl ds)"`) have lower priority than `~/.claude/settings.json` in Claude Code. If a provider is already configured there, the environment >variable will be ignored.
