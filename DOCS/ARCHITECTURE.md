@@ -30,6 +30,8 @@ cc-router-lite/
 | `dirs` (5) | 跨平台 home 目录解析 |
 | `thiserror` (2) | 错误类型派生 |
 
+| `dialoguer` (0.12) | 交互式 profile 选择器 |
+
 无 async 依赖 — 所有操作都是本地文件读写，同步即可。
 
 ## Data Structures
@@ -115,7 +117,7 @@ pub fn load_config(path: &Path) -> Result<HashMap<String, RawProfile>, CcrlError
 #[command(name = "ccrl", about = "Claude Code Router Lite")]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -133,12 +135,26 @@ enum Commands {
 ```
 
 分发逻辑：
+- `None` (no args, TTY) → 交互式 profile 选择器 (`dialoguer::Select`)
+- `None` (no args, non-TTY) → 输出 help
 - `Set { name }` → 注入 settings.json + 写 .current
 - `Now` → 读 .current 并输出
 - `List` → 读 config，列出所有 profile，标记 active
 - `Export(args)` → 取 `args[0]` 作为 profile 名，输出 export 语句
 
 ## Command Flows
+
+### `ccrl` (no args, interactive)
+
+```
+1. 检测 stdin/stdout 是否 TTY
+2. 非 TTY → 输出 help
+3. TTY → load_config, read_current()
+4. 构建 display items: "name (active) — description"
+5. dialoguer::Select 交互选择
+6. Escape/Ctrl-C → 静默退出
+7. 选择后 → 委托 cmd_set() 激活 profile
+```
 
 ### `ccrl set <name>`
 

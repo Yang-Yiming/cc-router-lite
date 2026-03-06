@@ -3,12 +3,13 @@ mod error;
 mod settings;
 mod state;
 
-use std::io;
+use std::io::{self, IsTerminal};
 use std::path::PathBuf;
 use std::process;
 
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::Shell;
+use dialoguer::Select;
 
 use crate::config::{load_config, resolve_profile};
 use crate::error::CcrlError;
@@ -21,7 +22,7 @@ struct Cli {
     config: Option<PathBuf>,
 
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -68,18 +69,27 @@ fn settings_path() -> PathBuf {
 
 fn run(cli: Cli) -> Result<(), CcrlError> {
     match cli.command {
-        Commands::Set { name } => cmd_set(&cli.config, &name),
-        Commands::Now => cmd_now(),
-        Commands::List => cmd_list(&cli.config),
-        Commands::Check { name } => cmd_check(&cli.config, name.as_deref()),
-        Commands::Validate => cmd_validate(&cli.config),
-        Commands::Completions { shell } => cmd_completions(shell),
-        Commands::Export(args) => {
-            let name = args
-                .first()
-                .ok_or_else(|| CcrlError::ProfileNotFound("(no name provided)".into()))?;
-            cmd_export(&cli.config, name)
+        None => {
+            if io::stdout().is_terminal() && io::stdin().is_terminal() {
+                cmd_interactive(&cli.config)
+            } else {
+                Cli::command().print_help().map_err(CcrlError::from)
+            }
         }
+        Some(cmd) => match cmd {
+            Commands::Set { name } => cmd_set(&cli.config, &name),
+            Commands::Now => cmd_now(),
+            Commands::List => cmd_list(&cli.config),
+            Commands::Check { name } => cmd_check(&cli.config, name.as_deref()),
+            Commands::Validate => cmd_validate(&cli.config),
+            Commands::Completions { shell } => cmd_completions(shell),
+            Commands::Export(args) => {
+                let name = args
+                    .first()
+                    .ok_or_else(|| CcrlError::ProfileNotFound("(no name provided)".into()))?;
+                cmd_export(&cli.config, name)
+            }
+        },
     }
 }
 
@@ -184,6 +194,49 @@ fn cmd_validate(custom_config: &Option<PathBuf>) -> Result<(), CcrlError> {
 fn cmd_completions(shell: Shell) -> Result<(), CcrlError> {
     clap_complete::generate(shell, &mut Cli::command(), "ccrl", &mut io::stdout());
     Ok(())
+}
+
+fn cmd_interactive(custom_config: &Option<PathBuf>) -> Result<(), CcrlError> {
+    let path = config_path(custom_config);
+    let profiles = load_config(&path)?;
+    let current = state::read_current();
+
+    let mut names: Vec<&String> = profiles.keys().collect();
+    names.sort();
+
+    let items: Vec<String> = names
+        .iter()
+        .map(|name| {
+            let active = if current.as_deref() == Some(name.as_str()) {
+                " (active)"
+            } else {
+                ""
+            };
+            let desc = profiles[*name]
+                .description
+                .as_deref()
+                .map(|d| format!(" — {}", d))
+                .unwrap_or_default();
+            format!("{}{}{}", name, active, desc)
+        })
+        .collect();
+
+    let default = current
+        .as_ref()
+        .and_then(|c| names.iter().position(|n| *n == c))
+        .unwrap_or(0);
+
+    let selection = Select::new()
+        .with_prompt("Select a profile")
+        .items(&items)
+        .default(default)
+        .interact_opt()
+        .map_err(|e| CcrlError::Io(e.into()))?;
+
+    match selection {
+        Some(idx) => cmd_set(custom_config, names[idx]),
+        None => Ok(()),
+    }
 }
 
 fn cmd_export(custom_config: &Option<PathBuf>, name: &str) -> Result<(), CcrlError> {

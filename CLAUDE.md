@@ -21,6 +21,7 @@ Always update them when you do edits.
 
 # Commands
 
+- `ccrl` — interactive profile selector (arrow keys + Enter)
 - `ccrl set <name>` — inject profile into settings.json
 - `ccrl now` — show active profile
 - `ccrl list` — list all profiles

@@ -29,6 +29,7 @@
 - [x] **Feature 1: `ccrl check`** — Connectivity check command
 - [x] **Feature 2: Notes/Description field** — Optional `description` field in profiles, shown in `ccrl list` output.
 - [x] **Feature 3: Shell completions** — `ccrl completions <shell>` generates completions via `clap_complete`. that tests each profile's API endpoint (`/v1/models`) and reports status with timing. Usage: `ccrl check` or `ccrl check <profile-name>`.
+- [x] **Feature 5: Interactive Profile Selector** — `ccrl` with no args shows `dialoguer::Select` inline picker (arrow keys + Enter). TTY check falls back to help for non-interactive shells. Escape/Ctrl-C exits cleanly.
 
 ## Completed Fixes
 
