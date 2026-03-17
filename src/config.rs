@@ -61,3 +61,42 @@ pub fn resolve_profile(name: &str, raw: &RawProfile) -> Result<Profile, CcrlErro
         env,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_value_literal() {
+        assert_eq!(resolve_value("https://api.anthropic.com").unwrap(), "https://api.anthropic.com");
+    }
+
+    #[test]
+    fn test_resolve_value_env_var() {
+        std::env::set_var("TEST_VAR", "test_value");
+        assert_eq!(resolve_value("$TEST_VAR").unwrap(), "test_value");
+    }
+
+    #[test]
+    fn test_resolve_value_missing_env() {
+        std::env::remove_var("MISSING_VAR");
+        assert!(matches!(
+            resolve_value("$MISSING_VAR"),
+            Err(CcrlError::EnvVarNotSet(_))
+        ));
+    }
+
+    #[test]
+    fn test_resolve_profile() {
+        std::env::set_var("TEST_AUTH", "sk-test");
+        let raw = RawProfile {
+            url: "https://api.test.com".into(),
+            auth: "$TEST_AUTH".into(),
+            env: HashMap::new(),
+            description: None,
+        };
+        let profile = resolve_profile("test", &raw).unwrap();
+        assert_eq!(profile.url, "https://api.test.com");
+        assert_eq!(profile.auth, "sk-test");
+    }
+}
