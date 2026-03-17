@@ -134,6 +134,7 @@ dependencies = [
  "assert_cmd",
  "clap",
  "clap_complete",
+ "console",
  "dialoguer",
  "dirs",
  "owo-colors",

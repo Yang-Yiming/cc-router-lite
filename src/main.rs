@@ -9,6 +9,7 @@ use std::process;
 
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::Shell;
+use console::style;
 use dialoguer::Select;
 use owo_colors::OwoColorize;
 
@@ -220,17 +221,21 @@ fn cmd_interactive(custom_config: &Option<PathBuf>) -> Result<(), CcrlError> {
     let items: Vec<String> = names
         .iter()
         .map(|name| {
-            let active = if current.as_deref() == Some(name.as_str()) {
-                " (active)"
-            } else {
-                ""
-            };
             let desc = profiles[*name]
                 .description
                 .as_deref()
                 .map(|d| format!(" — {}", d))
                 .unwrap_or_default();
-            format!("{}{}{}", name, active, desc)
+
+            if current.as_deref() == Some(name.as_str()) {
+                format!("{} {}  {}{}",
+                    style("*").cyan(),
+                    style(name).bold(),
+                    style("(active)").cyan(),
+                    desc)
+            } else {
+                format!("  {}{}", name, desc)
+            }
         })
         .collect();
 
