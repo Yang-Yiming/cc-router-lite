@@ -108,6 +108,20 @@ fn config_path(custom: &Option<PathBuf>) -> PathBuf {
     custom.clone().unwrap_or_else(default_config_path)
 }
 
+fn apply_color(text: &str, color: Option<&str>) -> String {
+    match color {
+        Some("red") => text.red().to_string(),
+        Some("green") => text.green().to_string(),
+        Some("yellow") => text.yellow().to_string(),
+        Some("blue") => text.blue().to_string(),
+        Some("magenta") => text.magenta().to_string(),
+        Some("cyan") => text.cyan().to_string(),
+        Some("white") => text.white().to_string(),
+        Some("black") => text.black().to_string(),
+        _ => text.to_string(),
+    }
+}
+
 fn cmd_set(custom_config: &Option<PathBuf>, name: &str) -> Result<(), CcrlError> {
     let path = config_path(custom_config);
     let profiles = load_config(&path)?;
@@ -150,11 +164,15 @@ fn cmd_list(custom_config: &Option<PathBuf>) -> Result<(), CcrlError> {
     let mut names: Vec<&String> = profiles.keys().collect();
     names.sort();
     for name in names {
-        let desc = profiles[name].description.as_deref().map(|d| format!(" — {}", d)).unwrap_or_default();
+        let raw = &profiles[name];
+        let profile = resolve_profile(name, raw)?;
+        let desc = raw.description.as_deref().map(|d| format!(" — {}", d)).unwrap_or_default();
         if current.as_deref() == Some(name.as_str()) {
-            println!("{} {}  {}{}", "*".cyan(), name.bold(), "(active)".cyan(), desc);
+            let colored_name = apply_color(&name.bold().to_string(), profile.color.as_deref());
+            println!("{} {}  {}{}", "*".cyan(), colored_name, "(active)".cyan(), desc);
         } else {
-            println!("  {}{}", name, desc);
+            let colored_name = apply_color(name, profile.color.as_deref());
+            println!("  {}{}", colored_name, desc);
         }
     }
     Ok(())
@@ -221,20 +239,32 @@ fn cmd_interactive(custom_config: &Option<PathBuf>) -> Result<(), CcrlError> {
     let items: Vec<String> = names
         .iter()
         .map(|name| {
-            let desc = profiles[*name]
+            let raw = &profiles[*name];
+            let profile = resolve_profile(name, raw).ok();
+            let desc = raw
                 .description
                 .as_deref()
                 .map(|d| format!(" — {}", d))
                 .unwrap_or_default();
 
             if current.as_deref() == Some(name.as_str()) {
+                let colored_name = profile
+                    .as_ref()
+                    .and_then(|p| p.color.as_deref())
+                    .map(|c| apply_color(&style(name).bold().to_string(), Some(c)))
+                    .unwrap_or_else(|| style(name).bold().to_string());
                 format!("{} {}  {}{}",
                     style("*").cyan(),
-                    style(name).bold(),
+                    colored_name,
                     style("(active)").cyan(),
                     desc)
             } else {
-                format!("  {}{}", name, desc)
+                let colored_name = profile
+                    .as_ref()
+                    .and_then(|p| p.color.as_deref())
+                    .map(|c| apply_color(name, Some(c)))
+                    .unwrap_or_else(|| name.to_string());
+                format!("  {}{}", colored_name, desc)
             }
         })
         .collect();

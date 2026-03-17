@@ -13,6 +13,7 @@ pub struct RawProfile {
     #[serde(default)]
     pub env: HashMap<String, toml::Value>,
     pub description: Option<String>,
+    pub color: Option<String>,
 }
 
 pub struct Profile {
@@ -21,6 +22,7 @@ pub struct Profile {
     pub url: String,
     pub auth: String,
     pub env: HashMap<String, JsonValue>,
+    pub color: Option<String>,
 }
 
 pub fn load_config(path: &Path) -> Result<HashMap<String, RawProfile>, CcrlError> {
@@ -32,6 +34,13 @@ pub fn load_config(path: &Path) -> Result<HashMap<String, RawProfile>, CcrlError
     Ok(profiles)
 }
 
+fn validate_color(color: &str) -> Result<(), CcrlError> {
+    match color {
+        "red" | "green" | "yellow" | "blue" | "magenta" | "cyan" | "white" | "black" => Ok(()),
+        _ => Err(CcrlError::InvalidColor(color.to_string()))
+    }
+}
+
 fn resolve_value(val: &str) -> Result<String, CcrlError> {
     if let Some(var_name) = val.strip_prefix('$') {
         std::env::var(var_name).map_err(|_| CcrlError::EnvVarNotSet(var_name.to_string()))
@@ -41,6 +50,9 @@ fn resolve_value(val: &str) -> Result<String, CcrlError> {
 }
 
 pub fn resolve_profile(name: &str, raw: &RawProfile) -> Result<Profile, CcrlError> {
+    if let Some(c) = &raw.color {
+        validate_color(c)?;
+    }
     let url = resolve_value(&raw.url)?;
     let auth = resolve_value(&raw.auth)?;
     let mut env = HashMap::new();
@@ -59,6 +71,7 @@ pub fn resolve_profile(name: &str, raw: &RawProfile) -> Result<Profile, CcrlErro
         url,
         auth,
         env,
+        color: raw.color.clone(),
     })
 }
 
@@ -94,6 +107,7 @@ mod tests {
             auth: "$TEST_AUTH".into(),
             env: HashMap::new(),
             description: None,
+            color: None,
         };
         let profile = resolve_profile("test", &raw).unwrap();
         assert_eq!(profile.url, "https://api.test.com");

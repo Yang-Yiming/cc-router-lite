@@ -32,12 +32,14 @@ brew install ccrl
 
 Create `~/.config/ccr-lite/config.toml`:
 
-Example: 
+Example:
 ```toml
 # Deepseek
 [ds]
 url = "https://api.deepseek.com/anthropic"
 auth = "$DEEPSEEK_API_KEY"
+color = "green"
+description = "Deepseek API"
 [ds.env]
 ANTHROPIC_MODEL="deepseek-chat"
 ANTHROPIC_SMALL_FAST_MODEL="deepseek-chat"
@@ -45,7 +47,13 @@ ANTHROPIC_SMALL_FAST_MODEL="deepseek-chat"
 [kimi]
 url = "https://api.moonshot.cn/anthropic/"
 auth = "sk-xxxx"
+color = "yellow"
+description = "Kimi API"
 ```
+
+**Optional fields:**
+- `color` — Display color in list/interactive mode. Supported: `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `black`
+- `description` — Short description shown in profile lists
 
 ## Usage
 

@@ -11,6 +11,9 @@ pub enum CcrlError {
     #[error("Environment variable '{0}' not set")]
     EnvVarNotSet(String),
 
+    #[error("Invalid color '{0}'. Supported: red, green, yellow, blue, magenta, cyan, white, black")]
+    InvalidColor(String),
+
     #[error("Invalid config: {0}")]
     TomlParse(#[from] toml::de::Error),
 

@@ -88,6 +88,7 @@ mod tests {
             url: "https://api.test.com".into(),
             auth: "sk-test".into(),
             env: HashMap::new(),
+            color: None,
         };
 
         inject_profile(&settings, &profile, &[]).unwrap();
@@ -116,6 +117,7 @@ mod tests {
             url: "https://new.com".into(),
             auth: "sk-new".into(),
             env: HashMap::new(),
+            color: None,
         };
 
         inject_profile(&settings, &profile, &["OLD_KEY".into()]).unwrap();
