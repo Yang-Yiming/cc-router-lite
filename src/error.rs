@@ -11,7 +11,7 @@ pub enum CcrlError {
     #[error("Environment variable '{0}' not set")]
     EnvVarNotSet(String),
 
-    #[error("Invalid color '{0}'. Supported: red, green, yellow, blue, magenta, cyan, white, black")]
+    #[error("Invalid color '{0}'. Supported: red, green, yellow, blue, magenta, cyan, white, black, or #RRGGBB hex")]
     InvalidColor(String),
 
     #[error("Invalid config: {0}")]

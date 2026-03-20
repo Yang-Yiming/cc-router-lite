@@ -34,10 +34,28 @@ pub fn load_config(path: &Path) -> Result<HashMap<String, RawProfile>, CcrlError
     Ok(profiles)
 }
 
+pub(crate) fn parse_hex_color(s: &str) -> Option<(u8, u8, u8)> {
+    let hex = s.strip_prefix('#')?;
+    match hex.len() {
+        6 => Some((
+            u8::from_str_radix(&hex[0..2], 16).ok()?,
+            u8::from_str_radix(&hex[2..4], 16).ok()?,
+            u8::from_str_radix(&hex[4..6], 16).ok()?,
+        )),
+        3 => Some((
+            u8::from_str_radix(&hex[0..1].repeat(2), 16).ok()?,
+            u8::from_str_radix(&hex[1..2].repeat(2), 16).ok()?,
+            u8::from_str_radix(&hex[2..3].repeat(2), 16).ok()?,
+        )),
+        _ => None,
+    }
+}
+
 fn validate_color(color: &str) -> Result<(), CcrlError> {
     match color {
         "red" | "green" | "yellow" | "blue" | "magenta" | "cyan" | "white" | "black" => Ok(()),
-        _ => Err(CcrlError::InvalidColor(color.to_string()))
+        _ if parse_hex_color(color).is_some() => Ok(()),
+        _ => Err(CcrlError::InvalidColor(color.to_string())),
     }
 }
 
@@ -78,6 +96,16 @@ pub fn resolve_profile(name: &str, raw: &RawProfile) -> Result<Profile, CcrlErro
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_hex_color() {
+        assert_eq!(parse_hex_color("#ff6464"), Some((255, 100, 100)));
+        assert_eq!(parse_hex_color("#f64"), Some((255, 102, 68)));
+        assert_eq!(parse_hex_color("#000000"), Some((0, 0, 0)));
+        assert_eq!(parse_hex_color("red"), None);
+        assert_eq!(parse_hex_color("#gg0000"), None);
+        assert_eq!(parse_hex_color("#12345"), None);
+    }
 
     #[test]
     fn test_resolve_value_literal() {

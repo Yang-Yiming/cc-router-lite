@@ -42,6 +42,10 @@
 - 新增 `ccrl list` 命令
 - shell export 值用单引号包裹
 
+## Completed Features (continued)
+
+- [x] **Feature 6: Per-profile color** — `color` field in config supports named colors and hex (`#RRGGBB` / `#RGB`). `parse_hex_color()` utility in `config.rs` parses hex strings without new deps; `apply_color()` in `main.rs` uses `owo-colors` `.truecolor(r,g,b)` for RGB output.
+
 ## Future Features
 
 Each feature below is self-contained and can be implemented in a separate session.

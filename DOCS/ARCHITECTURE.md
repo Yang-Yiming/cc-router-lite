@@ -235,6 +235,10 @@ pub fn inject_profile(
 
 关键点：不用 typed struct 反序列化 settings.json，因为其字段不固定且我们只关心 `env`。
 
+## Color Utilities (`config.rs`)
+
+`pub(crate) fn parse_hex_color(s: &str) -> Option<(u8, u8, u8)>` — parses `#RRGGBB` or `#RGB` hex strings into `(r, g, b)` tuples. Used by both `validate_color()` in `config.rs` and `apply_color()` in `main.rs`. No new dependencies — uses stdlib `u8::from_str_radix`. The `apply_color()` function in `main.rs` routes hex colors to `owo-colors`'s `.truecolor(r, g, b)` for 24-bit ANSI output.
+
 ## Design Decisions
 
 | 决策 | 理由 |

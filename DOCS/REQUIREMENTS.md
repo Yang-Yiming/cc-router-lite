@@ -24,6 +24,7 @@ auth = "$DOG_AUTH"                           # $ 前缀 = 从环境变量读取
 - 每个顶层 table 是一个 profile
 - `auth`（和 `url`）支持 `$` 前缀，表示从系统环境变量读取实际值
 - `[name.env]` 下的 kv 对会作为额外环境变量注入
+- 可选 `color` 字段：支持命名颜色（`red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `black`）或 hex 格式（`#RRGGBB` 或 3 位缩写 `#RGB`），例如 `color = "#ff6464"`
 
 ## Commands
 

@@ -13,7 +13,7 @@ use console::style;
 use dialoguer::Select;
 use owo_colors::OwoColorize;
 
-use crate::config::{load_config, resolve_profile};
+use crate::config::{load_config, parse_hex_color, resolve_profile};
 use crate::error::CcrlError;
 
 #[derive(Parser)]
@@ -118,7 +118,14 @@ fn apply_color(text: &str, color: Option<&str>) -> String {
         Some("cyan") => text.cyan().to_string(),
         Some("white") => text.white().to_string(),
         Some("black") => text.black().to_string(),
-        _ => text.to_string(),
+        Some(c) => {
+            if let Some((r, g, b)) = parse_hex_color(c) {
+                text.truecolor(r, g, b).to_string()
+            } else {
+                text.to_string()
+            }
+        }
+        None => text.to_string(),
     }
 }
 
