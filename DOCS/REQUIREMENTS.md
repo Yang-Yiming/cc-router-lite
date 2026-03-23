@@ -89,7 +89,7 @@ mode = "oauth"
 
 - `~/.codex/config.toml`：`ccrl` 负责设置顶层 `model_provider`，并同步 `[model_providers.<name>]`
 - `~/.codex/auth.json`：API key profile 会写为 API key 模式；`OAuth` 会恢复保存的 OAuth auth
-- `~/.config/ccr-lite/codex-oauth-auth.json`：由 `ccrl` 管理的 OAuth auth snapshot
+- `<config_dir>/ccr-lite/codex-oauth-auth.json`：由 `ccrl` 管理的 OAuth auth snapshot；例如 Linux 常见为 `~/.config/ccr-lite/codex-oauth-auth.json`，macOS 常见为 `~/Library/Application Support/ccr-lite/codex-oauth-auth.json`
 
 ## Commands
 
@@ -121,9 +121,9 @@ mode = "oauth"
 ### `ccrl` (no args, interactive)
 
 进入 TUI：
-- 顶部 prompt 显示 `Claude | Codex` 的 tab 风格标签，突出当前 target
+- 顶部 prompt 显示 `[Claude] [Codex]` 的 tab 风格标签，突出当前 target
 - 当前版本先按选定 target 显示对应 profiles
-- 列表第一项用于切换 target
+- 列表第一项为 `Switch target`
 - `codex` target 会额外显示一个 synthetic 选项 `OAuth`
 - `Enter` 激活选中的 profile
 - `Esc` / `Ctrl-C` 退出

@@ -223,8 +223,8 @@ fn current_display_name(current: &CurrentState) -> &str {
 
 fn tab_label(active_target: Target) -> String {
     match active_target {
-        Target::Claude => format!("{}  {}", "[Claude]".green().bold(), "Codex".dimmed()),
-        Target::Codex => format!("{}  {}", "Claude".dimmed(), "[Codex]".green().bold()),
+        Target::Claude => format!("{} {}", "[Claude]".green().bold(), "[Codex]".dimmed()),
+        Target::Codex => format!("{} {}", "[Claude]".dimmed(), "[Codex]".green().bold()),
     }
 }
 
@@ -236,12 +236,12 @@ fn interactive_items(
     let mut ids = Vec::new();
     let mut items = Vec::new();
 
-    let switch_label = match target {
-        Target::Claude => "Switch To Codex",
-        Target::Codex => "Switch To Claude",
-    };
     ids.push("__switch_target__".to_string());
-    items.push(format!("{} {}", style(">").cyan(), switch_label));
+    items.push(format!(
+        "{} {}",
+        style(">").cyan(),
+        style("Switch target").dim()
+    ));
 
     match target {
         Target::Claude => {
@@ -538,7 +538,7 @@ fn cmd_interactive(
             .with_prompt(format!(
                 "{}  {}",
                 tab_label(target),
-                style("Select a profile").cyan()
+                style("Choose profile").cyan()
             ))
             .items(&items)
             .default(default)

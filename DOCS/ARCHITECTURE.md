@@ -188,8 +188,8 @@ enum Commands {
 3. TTY → load_global_config(), read_current()
 4. 当前版本根据 `--target`、`.current` 或 `default_target` 确定 target
 5. 根据当前 target 加载对应 profiles
-6. 构建 display items，首项是 "Switch To Claude/Codex"
-7. prompt 显示 `Claude | Codex` tab 风格标签，突出当前 target
+6. 构建 display items，首项是 `Switch target`
+7. prompt 显示 `[Claude] [Codex]` tab 风格标签，突出当前 target
 8. `dialoguer::Select` 交互选择
 9. Escape/Ctrl-C → 静默退出
 10. 选择切换项时切换 target 并重绘列表
@@ -272,7 +272,7 @@ pub fn read_current() -> Option<CurrentState>;
 2. 设置或清除顶层 `model_provider`
 3. 同步 `[model_providers.<name>]`
 4. 读写 `~/.codex/auth.json`
-5. 在检测到 OAuth auth 时刷新 `~/.config/ccr-lite/codex-oauth-auth.json`
+5. 在检测到 OAuth auth 时刷新 `<config_dir>/ccr-lite/codex-oauth-auth.json`
 6. 提供 synthetic `OAuth` profile 的恢复能力
 
 ### `settings.rs` — settings.json 注入
