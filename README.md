@@ -6,7 +6,7 @@ This project is inspired by [Claude Code Router](https://github.com/musistudio/c
 
 Current status:
 - `claude` target is implemented
-- `codex` target uses the new interface but is not implemented yet
+- `codex` target is implemented with provider sync and OAuth restore
 
 ## Features
 
@@ -60,9 +60,23 @@ color = "yellow"
 description = "Kimi API"
 ```
 
+Create `~/.config/ccr-lite/codex.toml`:
+
+```toml
+[fox]
+url = "https://code.newcli.com/codex/v1"
+auth = "$FOX_API_KEY"
+color = "red"
+description = "Fox"
+wire_api = "responses"
+requires_openai_auth = true
+```
+
 **Optional fields:**
 - `color` — Display color in list/interactive mode. Supported: `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `black`
 - `description` — Short description shown in profile lists
+- `wire_api` — Codex provider `wire_api`, defaults to `responses`
+- `requires_openai_auth` — Codex provider flag, defaults to `true`
 
 ## Usage
 
@@ -84,6 +98,12 @@ ccrl --target claude check
 
 # Export env vars to the current shell (temporary)
 eval "$(ccrl --target claude ds)"
+
+# Activate a Codex provider and rewrite ~/.codex/config.toml + ~/.codex/auth.json
+ccrl --target codex set fox
+
+# Restore saved Codex OAuth auth and clear model_provider
+ccrl --target codex set OAuth
 ```
 >[!note]
 >Environment variable settings (e.g., `eval "$(ccrl ds)"`) have lower priority than `~/.claude/settings.json` in Claude Code. If a provider is already configured there, the environment >variable will be ignored.

@@ -87,6 +87,8 @@ mod tests {
             env: HashMap::new(),
             description: None,
             color: None,
+            wire_api: "responses".into(),
+            requires_openai_auth: true,
         };
 
         inject_profile(&settings, &profile, &[]).unwrap();
@@ -117,6 +119,8 @@ mod tests {
             env: HashMap::new(),
             description: None,
             color: None,
+            wire_api: "responses".into(),
+            requires_openai_auth: true,
         };
 
         inject_profile(&settings, &profile, &["OLD_KEY".into()]).unwrap();

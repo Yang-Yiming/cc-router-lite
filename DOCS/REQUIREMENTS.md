@@ -52,6 +52,8 @@ description = "fallback profile"
 [main]
 url = "https://api.example.com/v1"
 auth = "$CODEX_API_KEY"
+wire_api = "responses"
+requires_openai_auth = true
 
 [main.env]
 OPENAI_MODEL = "gpt-5.4"
@@ -64,6 +66,8 @@ OPENAI_MODEL = "gpt-5.4"
 - `[name.env]` 下的 kv 对会作为额外环境变量注入
 - 可选 `color` 字段：支持命名颜色（`red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `black`）或 hex 格式（`#RRGGBB` / `#RGB`）
 - 可选 `description` 字段：用于列表和 TUI 显示
+- `codex.toml` 可选 `wire_api` 字段，默认 `responses`
+- `codex.toml` 可选 `requires_openai_auth` 字段，默认 `true`
 
 ## State File
 
@@ -74,10 +78,18 @@ OPENAI_MODEL = "gpt-5.4"
 ```toml
 target = "codex"
 profile = "main"
+mode = "oauth"
 ```
 
 - `.current` 是运行状态，不是静态配置
 - 目标是让 `now` 命令和 TUI 都能恢复当前所在 target
+- `mode` 仅用于 synthetic profile，例如 Codex 的 `OAuth`
+
+## Codex Managed Files
+
+- `~/.codex/config.toml`：`ccrl` 负责设置顶层 `model_provider`，并同步 `[model_providers.<name>]`
+- `~/.codex/auth.json`：API key profile 会写为 API key 模式；`OAuth` 会恢复保存的 OAuth auth
+- `~/.config/ccr-lite/codex-oauth-auth.json`：由 `ccrl` 管理的 OAuth auth snapshot
 
 ## Commands
 
@@ -110,6 +122,7 @@ profile = "main"
 
 进入 TUI：
 - 当前版本先按选定 target 显示对应 profiles
+- `codex` target 会额外显示一个 synthetic 选项 `OAuth`
 - `Enter` 激活选中的 profile
 
 后续增强：

@@ -15,6 +15,7 @@ clap_complete = "4"
 dialoguer = "0.12"
 owo-colors = "4"
 console = "0.16"
+crossterm = "0.28"
 
 [dev-dependencies]
 assert_cmd = "2"

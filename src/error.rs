@@ -20,11 +20,14 @@ pub enum CcrlError {
     #[error("Invalid settings.json: {0}")]
     JsonParse(#[from] serde_json::Error),
 
+    #[error("Invalid auth.json: {0}")]
+    AuthJsonParse(String),
+
     #[error("Unsupported target '{0}'")]
     UnsupportedTarget(String),
 
-    #[error("Target '{0}' is not implemented yet")]
-    TargetNotImplemented(String),
+    #[error("No OAuth auth snapshot is available")]
+    OAuthSnapshotMissing,
 
     #[error("{0}")]
     Io(#[from] io::Error),

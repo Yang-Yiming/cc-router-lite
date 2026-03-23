@@ -17,7 +17,7 @@
 - [x] 新配置入口：`config.toml` + `claude.toml`
 - [x] `--target` CLI 接口
 - [x] `.current` 升级为 `target + profile`
-- [ ] `codex` target 实现
+- [x] `codex` target 实现
 - [ ] TUI 顶部 `Claude | Codex` tabs
 
 ## Implementation Order
@@ -144,11 +144,14 @@ Completes: subcommand names + profile names for `set`/`check`/`validate` args
 
 **State**
 - Update `.current` to store both `target` and `profile`
+- Add optional state mode for synthetic entries like `OAuth`
 
 **Design note**
 - No backward compatibility required, so profile names are only scoped within their target
 
 **Current implementation status**
-- The new interface is wired up for `claude`
-- `codex` currently returns a not-implemented error
+- `claude` and `codex` are both implemented
+- `codex` syncs `model_provider` and `[model_providers.*]` into `~/.codex/config.toml`
+- `codex` rewrites `~/.codex/auth.json` for API-key profiles
+- `codex` exposes a synthetic `OAuth` entry backed by a managed OAuth auth snapshot
 - Interactive tab switching is still pending

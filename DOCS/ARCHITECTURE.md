@@ -12,6 +12,7 @@ cc-router-lite/
 │   ├── PLAN.md
 │   └── ARCHITECTURE.md
 └── src/
+    ├── codex.rs      # ~/.codex/config.toml + auth.json management
     ├── main.rs       # CLI 定义 (clap) + 命令分发
     ├── config.rs     # 全局配置 + target profile 解析、~ 展开
     ├── settings.rs   # target settings 写入与 env 注入
@@ -90,6 +91,8 @@ pub struct RawProfile {
     pub env: HashMap<String, String>,
     pub color: Option<String>,
     pub description: Option<String>,
+    pub wire_api: Option<String>,
+    pub requires_openai_auth: Option<bool>,
 }
 
 /// 值解析：字面量 vs 环境变量引用
@@ -106,6 +109,8 @@ pub struct Profile {
     pub env: HashMap<String, String>,
     pub color: Option<String>,
     pub description: Option<String>,
+    pub wire_api: String,
+    pub requires_openai_auth: bool,
 }
 ```
 
@@ -131,6 +136,8 @@ pub fn load_profiles(path: &Path) -> Result<HashMap<String, RawProfile>, CcrlErr
 - `$` 开头 → `EnvVar`，通过 `std::env::var()` 获取实际值
 - 否则 → `Literal`，直接使用
 - `url` 和 `auth` 都走这个逻辑，保持一致性
+- `wire_api` 默认 `responses`
+- `requires_openai_auth` 默认 `true`
 
 ## CLI Design (`main.rs`)
 
@@ -168,7 +175,8 @@ enum Commands {
 - `Now` → 读 .current 并输出 target/profile
 - `List` → 读当前 target 的 profiles，列出并标记 active
 - `Export(args)` → 取 `args[0]` 作为 profile 名，在当前 target 下输出 export 语句
-- 当前实现仅 `claude` target 生效；`codex` 明确返回 not-implemented
+- `Claude` 走 `settings.rs`
+- `Codex` 走 `codex.rs`，同步 `~/.codex/config.toml` 和 `~/.codex/auth.json`
 
 ## Command Flows
 
@@ -194,10 +202,10 @@ enum Commands {
 1. 读取 global config，确定当前 target
 2. load_profiles(~/.config/ccr-lite/{target}.toml)
 3. resolve_profile(name) — 查找 profile，resolve url/auth 的 $ 引用
-4. 读取 target 对应的 settings sink（Claude settings.json / Codex 配置文件）
-5. 确保 root["env"] 存在（不存在则创建空 object）
-6. 注入 target 需要的基础 env、profile.env 的所有 kv
-7. serde_json::to_string_pretty() 写回
+4. `Claude`: 写 `~/.claude/settings.json`
+5. `Codex`: 若当前 auth 是 OAuth，则先刷新 OAuth snapshot
+6. `Codex`: 更新 `~/.codex/config.toml` 的 `model_provider` 和 `[model_providers.<name>]`
+7. `Codex`: 写 `~/.codex/auth.json` 为 API key 模式
 8. 写 target + profile 到 ~/.config/ccr-lite/.current
 9. println!("Profile '{name}' activated")
 ```
@@ -206,7 +214,7 @@ enum Commands {
 
 ```
 1. 读取 ~/.config/ccr-lite/.current
-2. 文件存在且非空 → 输出 target/profile
+2. 文件存在且非空 → 输出 target/profile；synthetic profile 可带 mode
 3. 否则 → "No active profile"
 ```
 
@@ -240,21 +248,32 @@ enum Commands {
 
 ### `state.rs` — 活跃 Profile 追踪
 
-状态文件: `~/.config/ccr-lite/.current`，TOML 格式，记录当前 target 和 profile。
+状态文件: `~/.config/ccr-lite/.current`，TOML 格式，记录当前 target、profile 和可选 mode。
 
 ```rust
 pub struct CurrentState {
     pub target: Target,
     pub profile: String,
+    pub mode: Option<CurrentMode>,
 }
 
 pub fn write_current(state: &CurrentState) -> Result<(), CcrlError>;
 pub fn read_current() -> Option<CurrentState>;
 ```
 
-- `write_current`: 确保父目录存在，写入 target/profile
+- `write_current`: 确保父目录存在，写入 target/profile/mode
 - `read_current`: 读取文件并反序列化；文件不存在或为空返回 None
 - 选择文件而非环境变量：环境变量不跨 shell session 持久化
+
+### `codex.rs` — Codex Provider/Auth 管理
+
+职责：
+1. 读写 `~/.codex/config.toml`
+2. 设置或清除顶层 `model_provider`
+3. 同步 `[model_providers.<name>]`
+4. 读写 `~/.codex/auth.json`
+5. 在检测到 OAuth auth 时刷新 `~/.config/ccr-lite/codex-oauth-auth.json`
+6. 提供 synthetic `OAuth` profile 的恢复能力
 
 ### `settings.rs` — settings.json 注入
 
@@ -286,7 +305,7 @@ pub fn inject_profile(
 | `config.toml` 只保留全局配置 | 避免把 target 元信息和 profile 定义混在一起 |
 | `claude.toml` / `codex.toml` 分文件存储 | target 语义清晰，TUI tabs 与配置文件一一对应 |
 | `serde_json::Value` 操作 settings.json | 保留所有未知字段，只修改 `env` |
-| `.current` TOML 状态文件 | 需要同时记录 target 与 profile |
+| `.current` TOML 状态文件 | 需要同时记录 target、profile 与 optional mode |
 | `external_subcommand` | 干净处理 `ccrl <name>` 与 `ccrl set/now/list` 共存 |
 | `thiserror` | 零成本错误类型派生，良好的用户错误信息 |
 | shell export 用单引号 | 避免值中特殊字符被 shell 解释 |

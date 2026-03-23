@@ -57,6 +57,8 @@ pub struct RawProfile {
     pub env: HashMap<String, toml::Value>,
     pub description: Option<String>,
     pub color: Option<String>,
+    pub wire_api: Option<String>,
+    pub requires_openai_auth: Option<bool>,
 }
 
 pub struct Profile {
@@ -67,6 +69,8 @@ pub struct Profile {
     pub env: HashMap<String, JsonValue>,
     pub description: Option<String>,
     pub color: Option<String>,
+    pub wire_api: String,
+    pub requires_openai_auth: bool,
 }
 
 pub fn default_target() -> Target {
@@ -166,6 +170,11 @@ pub fn resolve_profile(name: &str, raw: &RawProfile) -> Result<Profile, CcrlErro
         env,
         description: raw.description.clone(),
         color: raw.color.clone(),
+        wire_api: raw
+            .wire_api
+            .clone()
+            .unwrap_or_else(|| "responses".to_string()),
+        requires_openai_auth: raw.requires_openai_auth.unwrap_or(true),
     })
 }
 
@@ -215,11 +224,31 @@ mod tests {
             env: HashMap::new(),
             description: Some("demo".into()),
             color: None,
+            wire_api: None,
+            requires_openai_auth: None,
         };
         let profile = resolve_profile("test", &raw).unwrap();
         assert_eq!(profile.url, "https://api.test.com");
         assert_eq!(profile.auth, "sk-test");
         assert_eq!(profile.description.as_deref(), Some("demo"));
+        assert_eq!(profile.wire_api, "responses");
+        assert!(profile.requires_openai_auth);
+    }
+
+    #[test]
+    fn test_resolve_profile_codex_fields() {
+        let raw = RawProfile {
+            url: "https://api.test.com".into(),
+            auth: "sk-test".into(),
+            env: HashMap::new(),
+            description: None,
+            color: None,
+            wire_api: Some("chat_completions".into()),
+            requires_openai_auth: Some(false),
+        };
+        let profile = resolve_profile("test", &raw).unwrap();
+        assert_eq!(profile.wire_api, "chat_completions");
+        assert!(!profile.requires_openai_auth);
     }
 
     #[test]

@@ -6,9 +6,31 @@ use crate::config::Target;
 use crate::error::CcrlError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CurrentMode {
+    OAuth,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CurrentState {
     pub target: Target,
     pub profile: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<CurrentMode>,
+}
+
+impl CurrentState {
+    pub fn oauth(target: Target) -> Self {
+        Self {
+            target,
+            profile: "OAuth".to_string(),
+            mode: Some(CurrentMode::OAuth),
+        }
+    }
+
+    pub fn is_oauth(&self) -> bool {
+        self.mode == Some(CurrentMode::OAuth)
+    }
 }
 
 pub fn state_path() -> PathBuf {
@@ -48,10 +70,12 @@ mod tests {
     fn test_write_read_current() {
         let dir = tempdir().unwrap();
         std::env::set_var("HOME", dir.path());
+        std::env::set_var("XDG_CONFIG_HOME", dir.path().join(".config"));
 
         let state = CurrentState {
             target: Target::Claude,
             profile: "test-profile".to_string(),
+            mode: None,
         };
         write_current(&state).unwrap();
         assert_eq!(read_current(), Some(state));
@@ -61,6 +85,7 @@ mod tests {
     fn test_read_current_missing() {
         let dir = tempdir().unwrap();
         std::env::set_var("HOME", dir.path());
+        std::env::set_var("XDG_CONFIG_HOME", dir.path().join(".config"));
         assert_eq!(read_current(), None);
     }
 }
