@@ -7,6 +7,7 @@ This project is inspired by [Claude Code Router](https://github.com/musistudio/c
 Current status:
 - `claude` target is implemented
 - `codex` target is implemented with provider sync and OAuth restore
+- interactive mode uses a stable `dialoguer` picker with a tab-style target header
 
 ## Features
 
@@ -84,6 +85,9 @@ requires_openai_auth = true
 # Inject a Claude profile into ~/.claude/settings.json (persistent)
 ccrl --target claude set ds
 
+# Open the interactive picker
+ccrl
+
 # Show the active target/profile
 ccrl now
 
@@ -107,3 +111,8 @@ ccrl --target codex set OAuth
 ```
 >[!note]
 >Environment variable settings (e.g., `eval "$(ccrl ds)"`) have lower priority than `~/.claude/settings.json` in Claude Code. If a provider is already configured there, the environment >variable will be ignored.
+
+Interactive mode notes:
+- The prompt shows a `Claude` / `Codex` tab-style header for the current target.
+- The first list item switches target.
+- Arrow keys select a profile, `Enter` activates it, `Esc` or `Ctrl-C` exits.

@@ -18,7 +18,7 @@
 - [x] `--target` CLI 接口
 - [x] `.current` 升级为 `target + profile`
 - [x] `codex` target 实现
-- [ ] TUI 顶部 `Claude | Codex` tabs
+- [x] TUI 顶部 `Claude | Codex` tab 风格标识 + target 切换入口
 
 ## Implementation Order
 
@@ -50,7 +50,7 @@
 - 新增 `--target claude|codex` 全局选项
 - 新增 `claude.toml` / `codex.toml` 双配置文件布局
 - `.current` 记录 target + profile，而不是单纯 profile
-- TUI 顶部以 `Claude | Codex` tab 形式切换 target
+- TUI 顶部显示 `Claude | Codex` tab 风格标识，并通过列表入口切换 target
 
 ## Future Features
 
@@ -138,8 +138,8 @@ Completes: subcommand names + profile names for `set`/`check`/`validate` args
 - Existing verbs (`set`, `list`, `now`, `check`, `validate`, `diff`, export mode) operate within the selected target
 
 **TUI**
-- Add top tabs `Claude | Codex`
-- `Tab` / `Shift+Tab` switches target
+- Show a top `Claude | Codex` tab-style header
+- Add a first list entry to switch target
 - The profile list only renders the current target's profiles
 
 **State**
@@ -154,4 +154,4 @@ Completes: subcommand names + profile names for `set`/`check`/`validate` args
 - `codex` syncs `model_provider` and `[model_providers.*]` into `~/.codex/config.toml`
 - `codex` rewrites `~/.codex/auth.json` for API-key profiles
 - `codex` exposes a synthetic `OAuth` entry backed by a managed OAuth auth snapshot
-- Interactive tab switching is still pending
+- Interactive mode uses a stable inline picker with a tab-style target header and a switch-target entry

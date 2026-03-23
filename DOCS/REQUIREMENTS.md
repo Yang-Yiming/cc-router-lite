@@ -121,13 +121,12 @@ mode = "oauth"
 ### `ccrl` (no args, interactive)
 
 进入 TUI：
+- 顶部 prompt 显示 `Claude | Codex` 的 tab 风格标签，突出当前 target
 - 当前版本先按选定 target 显示对应 profiles
+- 列表第一项用于切换 target
 - `codex` target 会额外显示一个 synthetic 选项 `OAuth`
 - `Enter` 激活选中的 profile
-
-后续增强：
-- 顶部显示 `Claude | Codex` 两个 tab
-- `Tab` 切换 target
+- `Esc` / `Ctrl-C` 退出
 
 ## Constraints
 

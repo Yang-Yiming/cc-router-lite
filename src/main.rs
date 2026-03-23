@@ -5,19 +5,14 @@ mod settings;
 mod state;
 
 use std::collections::{HashMap, HashSet};
-use std::io::{self, IsTerminal, Write};
+use std::io::{self, IsTerminal};
 use std::path::PathBuf;
 use std::process;
 
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::Shell;
 use console::style;
-use crossterm::{
-    cursor,
-    event::{self, Event, KeyCode, KeyEvent},
-    execute,
-    terminal::{self, ClearType},
-};
+use dialoguer::Select;
 use owo_colors::OwoColorize;
 
 use crate::codex::OAUTH_PROFILE_NAME;
@@ -161,18 +156,6 @@ fn load_target_profiles(
     Ok((target, profiles))
 }
 
-fn load_target_profiles_optional(
-    custom_config: &Option<PathBuf>,
-    target: Target,
-) -> Result<HashMap<String, RawProfile>, CcrlError> {
-    let path = profiles_path(custom_config, target);
-    match load_profiles(&path) {
-        Ok(profiles) => Ok(profiles),
-        Err(CcrlError::ConfigNotFound(_)) => Ok(HashMap::new()),
-        Err(e) => Err(e),
-    }
-}
-
 fn current_state_for_target(target: Target) -> Option<CurrentState> {
     state::read_current().filter(|state| state.target == target)
 }
@@ -238,199 +221,72 @@ fn current_display_name(current: &CurrentState) -> &str {
     }
 }
 
-struct TuiTargetView {
+fn tab_label(active_target: Target) -> String {
+    match active_target {
+        Target::Claude => format!("{}  {}", "[Claude]".green().bold(), "Codex".dimmed()),
+        Target::Codex => format!("{}  {}", "Claude".dimmed(), "[Codex]".green().bold()),
+    }
+}
+
+fn interactive_items(
     target: Target,
-    names: Vec<String>,
-    profiles: HashMap<String, RawProfile>,
-}
+    profiles: &HashMap<String, RawProfile>,
+    current: Option<&CurrentState>,
+) -> Result<(Vec<String>, Vec<String>), CcrlError> {
+    let mut ids = Vec::new();
+    let mut items = Vec::new();
 
-impl TuiTargetView {
-    fn new(target: Target, profiles: HashMap<String, RawProfile>) -> Self {
-        let mut names: Vec<String> = profiles.keys().cloned().collect();
-        names.sort();
-        if target == Target::Codex {
-            names.push(OAUTH_PROFILE_NAME.to_string());
-        }
-        Self {
-            target,
-            names,
-            profiles,
-        }
-    }
+    let switch_label = match target {
+        Target::Claude => "Switch To Codex",
+        Target::Codex => "Switch To Claude",
+    };
+    ids.push("__switch_target__".to_string());
+    items.push(format!("{} {}", style(">").cyan(), switch_label));
 
-    fn is_empty(&self) -> bool {
-        self.names.is_empty()
-    }
-
-    fn active_name(&self, current: Option<&CurrentState>) -> Option<String> {
-        current.and_then(|state| {
-            if state.target != self.target {
-                None
-            } else if state.is_oauth() {
-                Some(OAUTH_PROFILE_NAME.to_string())
-            } else {
-                Some(state.profile.clone())
+    match target {
+        Target::Claude => {
+            let mut names: Vec<&String> = profiles.keys().collect();
+            names.sort();
+            for name in names {
+                let profile = resolve_profile(name, &profiles[name])?;
+                let active =
+                    current.as_ref().map(|c| current_display_name(c)) == Some(name.as_str());
+                ids.push(name.to_string());
+                items.push(format_profile_item(
+                    name,
+                    profile.description.as_deref(),
+                    profile.color.as_deref(),
+                    active,
+                ));
             }
-        })
-    }
-}
-
-struct TuiApp {
-    views: [TuiTargetView; 2],
-    active_target: Target,
-    selected: [usize; 2],
-}
-
-impl TuiApp {
-    fn new(
-        claude: HashMap<String, RawProfile>,
-        codex: HashMap<String, RawProfile>,
-        active_target: Target,
-        current: Option<CurrentState>,
-    ) -> Self {
-        let views = [
-            TuiTargetView::new(Target::Claude, claude),
-            TuiTargetView::new(Target::Codex, codex),
-        ];
-        let mut selected = [0usize; 2];
-        for (idx, view) in views.iter().enumerate() {
-            if let Some(active) = view.active_name(current.as_ref()) {
-                if let Some(pos) = view.names.iter().position(|name| name == &active) {
-                    selected[idx] = pos;
+        }
+        Target::Codex => {
+            maybe_refresh_codex_oauth_snapshot()?;
+            for name in codex_entries(profiles) {
+                let active =
+                    current.as_ref().map(|c| current_display_name(c)) == Some(name.as_str());
+                ids.push(name.clone());
+                if name == OAUTH_PROFILE_NAME {
+                    items.push(format_profile_item(
+                        &name,
+                        Some("Restore saved OAuth auth"),
+                        Some("magenta"),
+                        active,
+                    ));
+                } else {
+                    let profile = resolve_profile(&name, &profiles[&name])?;
+                    items.push(format_profile_item(
+                        &name,
+                        profile.description.as_deref(),
+                        profile.color.as_deref(),
+                        active,
+                    ));
                 }
             }
         }
-        Self {
-            views,
-            active_target,
-            selected,
-        }
     }
 
-    fn view(&self, target: Target) -> &TuiTargetView {
-        match target {
-            Target::Claude => &self.views[0],
-            Target::Codex => &self.views[1],
-        }
-    }
-
-    fn active_index(&self) -> usize {
-        match self.active_target {
-            Target::Claude => 0,
-            Target::Codex => 1,
-        }
-    }
-
-    fn move_selection(&mut self, delta: i32) {
-        let idx = self.active_index();
-        let view = self.view(self.active_target);
-        if view.is_empty() {
-            return;
-        }
-        let len = view.names.len() as i32;
-        let current = self.selected[idx] as i32;
-        let next = (current + delta).rem_euclid(len);
-        self.selected[idx] = next as usize;
-    }
-
-    fn current_name(&self) -> Option<&str> {
-        let view = self.view(self.active_target);
-        if view.is_empty() {
-            None
-        } else {
-            Some(view.names[self.selected[self.active_index()]].as_str())
-        }
-    }
-}
-
-fn render_tui(app: &TuiApp, current: Option<&CurrentState>) -> Result<(), CcrlError> {
-    let mut stdout = io::stdout();
-    execute!(
-        stdout,
-        terminal::Clear(ClearType::All),
-        cursor::MoveTo(0, 0)
-    )?;
-
-    let claude_active = app.active_target == Target::Claude;
-    let codex_active = app.active_target == Target::Codex;
-    let tabs = format!(
-        "{} {}",
-        if claude_active {
-            style("Claude").bold().green().to_string()
-        } else {
-            style("Claude").dim().to_string()
-        },
-        if codex_active {
-            style("Codex").bold().green().to_string()
-        } else {
-            style("Codex").dim().to_string()
-        }
-    );
-    println!("{tabs}");
-    println!(
-        "{}",
-        style("Use Tab to switch target, Enter to activate, q to quit").cyan()
-    );
-    println!();
-
-    let view = app.view(app.active_target);
-    if view.is_empty() {
-        println!("{}", style("No profiles configured").yellow());
-        stdout.flush()?;
-        return Ok(());
-    }
-
-    let current_name = view.active_name(current);
-    for (idx, name) in view.names.iter().enumerate() {
-        let prefix = if idx == app.selected[app.active_index()] {
-            ">"
-        } else {
-            " "
-        };
-        if name == OAUTH_PROFILE_NAME {
-            let active = current_name.as_deref() == Some(OAUTH_PROFILE_NAME);
-            let label = if active {
-                style(name).bold().magenta().to_string()
-            } else {
-                style(name).magenta().to_string()
-            };
-            println!(
-                "{} {}{}",
-                prefix,
-                label,
-                if active { "  (active)" } else { "" }
-            );
-        } else {
-            let profile = resolve_profile(name, &view.profiles[name])?;
-            let active = current_name.as_deref() == Some(name.as_str());
-            let label = if active {
-                apply_color(&style(name).bold().to_string(), profile.color.as_deref())
-            } else {
-                apply_color(name, profile.color.as_deref())
-            };
-            let desc = profile
-                .description
-                .as_deref()
-                .map(|d| format!(" - {}", d))
-                .unwrap_or_default();
-            println!(
-                "{} {}{}{}",
-                prefix,
-                label,
-                if active { "  (active)" } else { "" },
-                desc
-            );
-        }
-    }
-
-    stdout.flush()?;
-    Ok(())
-}
-
-fn cleanup_tui(stdout: &mut io::Stdout) -> Result<(), CcrlError> {
-    execute!(stdout, terminal::LeaveAlternateScreen, cursor::Show)?;
-    terminal::disable_raw_mode()?;
-    Ok(())
+    Ok((ids, items))
 }
 
 fn cmd_set(
@@ -657,7 +513,7 @@ fn cmd_interactive(
     custom_config: &Option<PathBuf>,
     explicit_target: Option<Target>,
 ) -> Result<(), CcrlError> {
-    let start_target = if let Some(target) = explicit_target {
+    let mut target = if let Some(target) = explicit_target {
         target
     } else if let Some(current) = state::read_current() {
         current.target
@@ -665,102 +521,44 @@ fn cmd_interactive(
         selected_target(custom_config, None)?
     };
 
-    let claude_profiles = load_target_profiles_optional(custom_config, Target::Claude)?;
-    let codex_profiles = load_target_profiles_optional(custom_config, Target::Codex)?;
-    let current = state::read_current();
-    let current_for_tui = current.clone();
-    let mut app = TuiApp::new(claude_profiles, codex_profiles, start_target, current);
+    loop {
+        let profiles = load_profiles(&profiles_path(custom_config, target))?;
+        let current = current_state_for_target(target);
+        let (ids, items) = interactive_items(target, &profiles, current.as_ref())?;
 
-    if app.active_target == Target::Codex {
-        maybe_refresh_codex_oauth_snapshot()?;
-    }
+        let default = current
+            .as_ref()
+            .and_then(|c| {
+                let current_name = current_display_name(c);
+                ids.iter().position(|id| id == current_name)
+            })
+            .unwrap_or(1.min(items.len().saturating_sub(1)));
 
-    terminal::enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, terminal::EnterAlternateScreen, cursor::Hide)?;
+        let selection = Select::new()
+            .with_prompt(format!(
+                "{}  {}",
+                tab_label(target),
+                style("Select a profile").cyan()
+            ))
+            .items(&items)
+            .default(default)
+            .interact_opt()
+            .map_err(|e| CcrlError::Io(e.into()))?;
 
-    let mut selected: Option<(Target, String)> = None;
-    let result = (|| -> Result<(), CcrlError> {
-        loop {
-            render_tui(&app, current_for_tui.as_ref())?;
-            let event = event::read().map_err(CcrlError::from)?;
-            let key = match event {
-                Event::Key(key) => key,
-                _ => continue,
+        let Some(index) = selection else {
+            return Ok(());
+        };
+
+        let selected = &ids[index];
+        if selected == "__switch_target__" {
+            target = match target {
+                Target::Claude => Target::Codex,
+                Target::Codex => Target::Claude,
             };
-
-            match key {
-                KeyEvent {
-                    code: KeyCode::Char('q'),
-                    ..
-                }
-                | KeyEvent {
-                    code: KeyCode::Esc, ..
-                } => break,
-                KeyEvent {
-                    code: KeyCode::Char('c'),
-                    modifiers,
-                    ..
-                } if modifiers.contains(event::KeyModifiers::CONTROL) => break,
-                KeyEvent {
-                    code: KeyCode::Tab, ..
-                }
-                | KeyEvent {
-                    code: KeyCode::Right,
-                    ..
-                }
-                | KeyEvent {
-                    code: KeyCode::BackTab,
-                    ..
-                }
-                | KeyEvent {
-                    code: KeyCode::Left,
-                    ..
-                } => {
-                    app.active_target = match app.active_target {
-                        Target::Claude => Target::Codex,
-                        Target::Codex => Target::Claude,
-                    };
-                    if app.active_target == Target::Codex {
-                        maybe_refresh_codex_oauth_snapshot()?;
-                    }
-                }
-                KeyEvent {
-                    code: KeyCode::Up, ..
-                }
-                | KeyEvent {
-                    code: KeyCode::Char('k'),
-                    ..
-                } => app.move_selection(-1),
-                KeyEvent {
-                    code: KeyCode::Down,
-                    ..
-                }
-                | KeyEvent {
-                    code: KeyCode::Char('j'),
-                    ..
-                } => app.move_selection(1),
-                KeyEvent {
-                    code: KeyCode::Enter,
-                    ..
-                } => {
-                    if let Some(name) = app.current_name() {
-                        selected = Some((app.active_target, name.to_string()));
-                        break;
-                    }
-                }
-                _ => {}
-            }
+            continue;
         }
-        Ok(())
-    })();
 
-    cleanup_tui(&mut stdout)?;
-    result?;
-    if let Some((target, name)) = selected {
-        cmd_set(custom_config, Some(target), &name)
-    } else {
-        Ok(())
+        return cmd_set(custom_config, Some(target), selected);
     }
 }
 

@@ -186,14 +186,14 @@ enum Commands {
 1. 检测 stdin/stdout 是否 TTY
 2. 非 TTY → 输出 help
 3. TTY → load_global_config(), read_current()
-4. 当前版本根据 `--target` 或 `default_target` 确定 target
+4. 当前版本根据 `--target`、`.current` 或 `default_target` 确定 target
 5. 根据当前 target 加载对应 profiles
-6. 构建 display items: "name (active) - description"
-7. dialoguer::Select 交互选择
-8. Escape/Ctrl-C → 静默退出
-9. 选择后 → 委托 cmd_set() 激活 profile
-
-> 备注：顶部 `Claude | Codex` tabs 是下一步 TUI 演进目标，当前版本还未实现
+6. 构建 display items，首项是 "Switch To Claude/Codex"
+7. prompt 显示 `Claude | Codex` tab 风格标签，突出当前 target
+8. `dialoguer::Select` 交互选择
+9. Escape/Ctrl-C → 静默退出
+10. 选择切换项时切换 target 并重绘列表
+11. 选择 profile 后 → 委托 `cmd_set()` 激活 profile
 ```
 
 ### `ccrl set <name>`
