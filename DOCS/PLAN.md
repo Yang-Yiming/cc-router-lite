@@ -14,6 +14,11 @@
 - [x] main.rs — CLI + 命令分发
 - [x] 集成测试
 - [x] cargo clippy + fmt
+- [x] 新配置入口：`config.toml` + `claude.toml`
+- [x] `--target` CLI 接口
+- [x] `.current` 升级为 `target + profile`
+- [ ] `codex` target 实现
+- [ ] TUI 顶部 `Claude | Codex` tabs
 
 ## Implementation Order
 
@@ -30,6 +35,7 @@
 - [x] **Feature 2: Notes/Description field** — Optional `description` field in profiles, shown in `ccrl list` output.
 - [x] **Feature 3: Shell completions** — `ccrl completions <shell>` generates completions via `clap_complete`. that tests each profile's API endpoint (`/v1/models`) and reports status with timing. Usage: `ccrl check` or `ccrl check <profile-name>`.
 - [x] **Feature 5: Interactive Profile Selector** — `ccrl` with no args shows `dialoguer::Select` inline picker (arrow keys + Enter). TTY check falls back to help for non-interactive shells. Escape/Ctrl-C exits cleanly.
+- [x] **Feature 6: Per-profile color** — `color` field in config supports named colors and hex (`#RRGGBB` / `#RGB`). `parse_hex_color()` utility in `config.rs` parses hex strings without new deps; `apply_color()` in `main.rs` uses `owo-colors` `.truecolor(r,g,b)` for RGB output.
 
 ## Completed Fixes
 
@@ -41,10 +47,10 @@
 - `url` 和 `auth` 统一支持 `$` 环境变量前缀
 - 新增 `ccrl list` 命令
 - shell export 值用单引号包裹
-
-## Completed Features (continued)
-
-- [x] **Feature 6: Per-profile color** — `color` field in config supports named colors and hex (`#RRGGBB` / `#RGB`). `parse_hex_color()` utility in `config.rs` parses hex strings without new deps; `apply_color()` in `main.rs` uses `owo-colors` `.truecolor(r,g,b)` for RGB output.
+- 新增 `--target claude|codex` 全局选项
+- 新增 `claude.toml` / `codex.toml` 双配置文件布局
+- `.current` 记录 target + profile，而不是单纯 profile
+- TUI 顶部以 `Claude | Codex` tab 形式切换 target
 
 ## Future Features
 
@@ -116,3 +122,33 @@ Completes: subcommand names + profile names for `set`/`check`/`validate` args
 [✓] work-anthropic
 [✗] personal-bedrock  env var BEDROCK_KEY not set
 ```
+
+---
+
+### Feature 5: Dual Target Support (`claude` / `codex`)
+
+**Config layout**
+- `~/.config/ccr-lite/config.toml` holds global settings only
+- `~/.config/ccr-lite/claude.toml` holds Claude profiles
+- `~/.config/ccr-lite/codex.toml` holds Codex profiles
+
+**CLI**
+- Add `--target <claude|codex>`
+- Default target is read from `config.toml`
+- Existing verbs (`set`, `list`, `now`, `check`, `validate`, `diff`, export mode) operate within the selected target
+
+**TUI**
+- Add top tabs `Claude | Codex`
+- `Tab` / `Shift+Tab` switches target
+- The profile list only renders the current target's profiles
+
+**State**
+- Update `.current` to store both `target` and `profile`
+
+**Design note**
+- No backward compatibility required, so profile names are only scoped within their target
+
+**Current implementation status**
+- The new interface is wired up for `claude`
+- `codex` currently returns a not-implemented error
+- Interactive tab switching is still pending

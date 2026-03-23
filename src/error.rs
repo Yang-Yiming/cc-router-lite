@@ -20,6 +20,12 @@ pub enum CcrlError {
     #[error("Invalid settings.json: {0}")]
     JsonParse(#[from] serde_json::Error),
 
+    #[error("Unsupported target '{0}'")]
+    UnsupportedTarget(String),
+
+    #[error("Target '{0}' is not implemented yet")]
+    TargetNotImplemented(String),
+
     #[error("{0}")]
     Io(#[from] io::Error),
 }

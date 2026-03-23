@@ -13,9 +13,9 @@ cc-router-lite/
 │   └── ARCHITECTURE.md
 └── src/
     ├── main.rs       # CLI 定义 (clap) + 命令分发
-    ├── config.rs     # config.toml 解析、数据结构、~ 展开
-    ├── settings.rs   # settings.json 读写与 env 注入
-    ├── state.rs      # .current 活跃 profile 追踪
+    ├── config.rs     # 全局配置 + target profile 解析、~ 展开
+    ├── settings.rs   # target settings 写入与 env 注入
+    ├── state.rs      # .current 活跃 target/profile 追踪
     └── error.rs      # 统一错误类型 CcrlError
 ```
 
@@ -69,6 +69,18 @@ pub enum CcrlError {
 use serde::Deserialize;
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Target {
+    Claude,
+    Codex,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GlobalConfig {
+    // parsed and validated against Target
+    pub default_target: Target,
+}
+
 /// config.toml 中每个 profile 的原始结构
 #[derive(Debug, Deserialize)]
 pub struct RawProfile {
@@ -76,6 +88,8 @@ pub struct RawProfile {
     pub auth: String,
     #[serde(default)]
     pub env: HashMap<String, String>,
+    pub color: Option<String>,
+    pub description: Option<String>,
 }
 
 /// 值解析：字面量 vs 环境变量引用
@@ -90,16 +104,26 @@ pub struct Profile {
     pub url: String,
     pub auth: String,
     pub env: HashMap<String, String>,
+    pub color: Option<String>,
+    pub description: Option<String>,
 }
 ```
 
-**解析策略**: 去掉 `settings_file` 配置项，settings.json 路径硬编码为 `~/.claude/settings.json`。这样 config.toml 只包含 profile tables，可以直接反序列化为 `HashMap<String, RawProfile>`：
+**解析策略**：
+- `config.toml` 只包含全局设置，例如 `default_target`
+- `claude.toml` 和 `codex.toml` 分别保存各自 target 的 profile tables
+- `config.rs` 提供 `load_global_config()` 和 `load_profiles(target)` 两层加载逻辑
+- `load_profiles(target)` 内部把 target 映射到固定文件名，例如 `claude.toml` / `codex.toml`
 
 ```rust
-pub fn load_config(path: &Path) -> Result<HashMap<String, RawProfile>, CcrlError> {
+pub fn load_global_config(path: &Path) -> Result<GlobalConfig, CcrlError> {
     let content = fs::read_to_string(path)?;
-    let profiles: HashMap<String, RawProfile> = toml::from_str(&content)?;
-    Ok(profiles)
+    Ok(toml::from_str(&content)?)
+}
+
+pub fn load_profiles(path: &Path) -> Result<HashMap<String, RawProfile>, CcrlError> {
+    let content = fs::read_to_string(path)?;
+    Ok(toml::from_str(&content)?)
 }
 ```
 
@@ -110,19 +134,22 @@ pub fn load_config(path: &Path) -> Result<HashMap<String, RawProfile>, CcrlError
 
 ## CLI Design (`main.rs`)
 
-使用 clap derive + `external_subcommand` 同时支持 `ccrl set fox` 和 `ccrl fox`：
+使用 clap derive + `external_subcommand` 同时支持 `ccrl set fox` 和 `ccrl fox`，并通过 `--target` 选择 Claude 或 Codex：
 
 ```rust
 #[derive(Parser)]
 #[command(name = "ccrl", about = "Claude Code Router Lite")]
 struct Cli {
+    #[arg(long, global = true)]
+    target: Option<Target>,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Inject profile into settings.json
+    /// Inject profile into target settings
     Set { name: String },
     /// Show active profile
     Now,
@@ -135,12 +162,13 @@ enum Commands {
 ```
 
 分发逻辑：
-- `None` (no args, TTY) → 交互式 profile 选择器 (`dialoguer::Select`)
+- `None` (no args, TTY) → 交互式 target/profile 选择器
 - `None` (no args, non-TTY) → 输出 help
-- `Set { name }` → 注入 settings.json + 写 .current
-- `Now` → 读 .current 并输出
-- `List` → 读 config，列出所有 profile，标记 active
-- `Export(args)` → 取 `args[0]` 作为 profile 名，输出 export 语句
+- `Set { name }` → 注入当前 target 的 settings + 写 .current
+- `Now` → 读 .current 并输出 target/profile
+- `List` → 读当前 target 的 profiles，列出并标记 active
+- `Export(args)` → 取 `args[0]` 作为 profile 名，在当前 target 下输出 export 语句
+- 当前实现仅 `claude` target 生效；`codex` 明确返回 not-implemented
 
 ## Command Flows
 
@@ -149,43 +177,49 @@ enum Commands {
 ```
 1. 检测 stdin/stdout 是否 TTY
 2. 非 TTY → 输出 help
-3. TTY → load_config, read_current()
-4. 构建 display items: "name (active) — description"
-5. dialoguer::Select 交互选择
-6. Escape/Ctrl-C → 静默退出
-7. 选择后 → 委托 cmd_set() 激活 profile
+3. TTY → load_global_config(), read_current()
+4. 当前版本根据 `--target` 或 `default_target` 确定 target
+5. 根据当前 target 加载对应 profiles
+6. 构建 display items: "name (active) - description"
+7. dialoguer::Select 交互选择
+8. Escape/Ctrl-C → 静默退出
+9. 选择后 → 委托 cmd_set() 激活 profile
+
+> 备注：顶部 `Claude | Codex` tabs 是下一步 TUI 演进目标，当前版本还未实现
 ```
 
 ### `ccrl set <name>`
 
 ```
-1. load_config(~/.config/ccr-lite/config.toml)
-2. resolve_profile(name) — 查找 profile，resolve url/auth 的 $ 引用
-3. 读取 ~/.claude/settings.json → serde_json::Value
-4. 确保 root["env"] 存在（不存在则创建空 object）
-5. 注入 ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, [name.env] 的所有 kv
-6. serde_json::to_string_pretty() 写回
-7. 写 profile 名到 ~/.config/ccr-lite/.current
-8. println!("Profile '{name}' activated")
+1. 读取 global config，确定当前 target
+2. load_profiles(~/.config/ccr-lite/{target}.toml)
+3. resolve_profile(name) — 查找 profile，resolve url/auth 的 $ 引用
+4. 读取 target 对应的 settings sink（Claude settings.json / Codex 配置文件）
+5. 确保 root["env"] 存在（不存在则创建空 object）
+6. 注入 target 需要的基础 env、profile.env 的所有 kv
+7. serde_json::to_string_pretty() 写回
+8. 写 target + profile 到 ~/.config/ccr-lite/.current
+9. println!("Profile '{name}' activated")
 ```
 
 ### `ccrl now`
 
 ```
 1. 读取 ~/.config/ccr-lite/.current
-2. 文件存在且非空 → 输出 profile 名
+2. 文件存在且非空 → 输出 target/profile
 3. 否则 → "No active profile"
 ```
 
 ### `ccrl <name>` (shell export)
 
 ```
-1. load_config + resolve_profile
-2. 输出到 stdout:
+1. 读取当前 target
+2. load_profiles + resolve_profile
+3. 输出到 stdout:
    export ANTHROPIC_BASE_URL='<url>'
    export ANTHROPIC_AUTH_TOKEN='<auth>'
    export KEY='value'  (for each in profile.env)
-3. 不写 .current（临时操作）
+4. 不写 .current（临时操作）
 ```
 
 用户使用方式: `eval "$(ccrl fox)"`
@@ -194,9 +228,10 @@ enum Commands {
 ### `ccrl list`
 
 ```
-1. load_config
-2. read_current() 获取当前 active profile
-3. 遍历 profiles，输出:
+1. 读取当前 target
+2. load_profiles(target)
+3. read_current() 获取当前 active target/profile
+4. 遍历 profiles，输出:
    * fox  (active)
      dog
 ```
@@ -205,15 +240,20 @@ enum Commands {
 
 ### `state.rs` — 活跃 Profile 追踪
 
-状态文件: `~/.config/ccr-lite/.current`，纯文本，内容仅为 profile 名称。
+状态文件: `~/.config/ccr-lite/.current`，TOML 格式，记录当前 target 和 profile。
 
 ```rust
-pub fn write_current(name: &str) -> Result<(), CcrlError>;
-pub fn read_current() -> Option<String>;
+pub struct CurrentState {
+    pub target: Target,
+    pub profile: String,
+}
+
+pub fn write_current(state: &CurrentState) -> Result<(), CcrlError>;
+pub fn read_current() -> Option<CurrentState>;
 ```
 
-- `write_current`: 确保父目录存在，写入 profile 名
-- `read_current`: 读取文件，trim 后返回；文件不存在或为空返回 None
+- `write_current`: 确保父目录存在，写入 target/profile
+- `read_current`: 读取文件并反序列化；文件不存在或为空返回 None
 - 选择文件而非环境变量：环境变量不跨 shell session 持久化
 
 ### `settings.rs` — settings.json 注入
@@ -243,11 +283,12 @@ pub fn inject_profile(
 
 | 决策 | 理由 |
 |------|------|
-| 去掉 `settings_file` 配置项 | 简化 config 解析，路径硬编码 `~/.claude/settings.json` |
-| `HashMap<String, RawProfile>` 直接反序列化 | config.toml 纯 profile tables，无需手动解析 |
+| `config.toml` 只保留全局配置 | 避免把 target 元信息和 profile 定义混在一起 |
+| `claude.toml` / `codex.toml` 分文件存储 | target 语义清晰，TUI tabs 与配置文件一一对应 |
 | `serde_json::Value` 操作 settings.json | 保留所有未知字段，只修改 `env` |
-| `.current` 纯文本文件 | 最简单的持久化状态方案 |
+| `.current` TOML 状态文件 | 需要同时记录 target 与 profile |
 | `external_subcommand` | 干净处理 `ccrl <name>` 与 `ccrl set/now/list` 共存 |
 | `thiserror` | 零成本错误类型派生，良好的用户错误信息 |
 | shell export 用单引号 | 避免值中特殊字符被 shell 解释 |
 | `url` 和 `auth` 统一支持 `$` 前缀 | 一致性，低成本 |
+| `--target` 作为全局选项 | 保持 CLI 简洁，避免嵌套子命令膨胀 |

@@ -50,10 +50,7 @@ pub fn inject_profile(
     Ok(())
 }
 
-pub fn remove_keys(
-    settings_path: &Path,
-    keys: &[String],
-) -> Result<(), CcrlError> {
+pub fn remove_keys(settings_path: &Path, keys: &[String]) -> Result<(), CcrlError> {
     if !settings_path.exists() {
         return Ok(());
     }
@@ -75,8 +72,8 @@ pub fn remove_keys(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use std::collections::HashMap;
+    use tempfile::tempdir;
 
     #[test]
     fn test_inject_profile_new_file() {
@@ -88,6 +85,7 @@ mod tests {
             url: "https://api.test.com".into(),
             auth: "sk-test".into(),
             env: HashMap::new(),
+            description: None,
             color: None,
         };
 
@@ -117,6 +115,7 @@ mod tests {
             url: "https://new.com".into(),
             auth: "sk-new".into(),
             env: HashMap::new(),
+            description: None,
             color: None,
         };
 

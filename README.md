@@ -1,8 +1,12 @@
-# ccrl — Claude Code Router Lite
+# ccrl — Codex/Claude Code Router Lite
 
-A lightweight CLI for switching between multiple Claude Code API profiles.
+A lightweight CLI for switching between multiple API profiles behind a target-aware interface.
 
 This project is inspired by [Claude Code Router](https://github.com/musistudio/claude-code-router), a powerful routing solution with many features. Unlike it, this project only focuses on being extremely lightweight, operating only by injecting environment variables into `~/.claude/settings.json`.
+
+Current status:
+- `claude` target is implemented
+- `codex` target uses the new interface but is not implemented yet
 
 ## Features
 
@@ -34,7 +38,12 @@ Create `~/.config/ccr-lite/config.toml`:
 
 Example:
 ```toml
-# Deepseek
+default_target = "claude"
+```
+
+Create `~/.config/ccr-lite/claude.toml`:
+
+```toml
 [ds]
 url = "https://api.deepseek.com/anthropic"
 auth = "$DEEPSEEK_API_KEY"
@@ -58,23 +67,23 @@ description = "Kimi API"
 ## Usage
 
 ```sh
-# Inject a profile into ~/.claude/settings.json (persistent)
-ccrl set ds
+# Inject a Claude profile into ~/.claude/settings.json (persistent)
+ccrl --target claude set ds
 
-# Show the active profile
+# Show the active target/profile
 ccrl now
 
-# List all profiles
-ccrl list
+# List Claude profiles
+ccrl --target claude list
 
 # Validate all profiles (env var resolution, no network)
-ccrl validate
+ccrl --target claude validate
 
 # Check API connectivity for all profiles
-ccrl check
+ccrl --target claude check
 
 # Export env vars to the current shell (temporary)
-eval "$(ccrl ds)"
+eval "$(ccrl --target claude ds)"
 ```
 >[!note]
 >Environment variable settings (e.g., `eval "$(ccrl ds)"`) have lower priority than `~/.claude/settings.json` in Claude Code. If a provider is already configured there, the environment >variable will be ignored.

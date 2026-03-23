@@ -1,7 +1,15 @@
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+use crate::config::Target;
 use crate::error::CcrlError;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CurrentState {
+    pub target: Target,
+    pub profile: String,
+}
 
 pub fn state_path() -> PathBuf {
     let mut p = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
@@ -10,21 +18,25 @@ pub fn state_path() -> PathBuf {
     p
 }
 
-pub fn write_current(name: &str) -> Result<(), CcrlError> {
+pub fn write_current(state: &CurrentState) -> Result<(), CcrlError> {
     let path = state_path();
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(&path, name)?;
+    let content = toml::to_string(state).map_err(|e| {
+        CcrlError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            e.to_string(),
+        ))
+    })?;
+    fs::write(&path, content)?;
     Ok(())
 }
 
-pub fn read_current() -> Option<String> {
+pub fn read_current() -> Option<CurrentState> {
     let path = state_path();
-    fs::read_to_string(path)
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+    let content = fs::read_to_string(path).ok()?;
+    toml::from_str(&content).ok()
 }
 
 #[cfg(test)]
@@ -37,8 +49,12 @@ mod tests {
         let dir = tempdir().unwrap();
         std::env::set_var("HOME", dir.path());
 
-        write_current("test-profile").unwrap();
-        assert_eq!(read_current(), Some("test-profile".to_string()));
+        let state = CurrentState {
+            target: Target::Claude,
+            profile: "test-profile".to_string(),
+        };
+        write_current(&state).unwrap();
+        assert_eq!(read_current(), Some(state));
     }
 
     #[test]
