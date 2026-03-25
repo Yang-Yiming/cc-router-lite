@@ -18,7 +18,7 @@
 - [x] `--target` CLI 接口
 - [x] `.current` 升级为 `target + profile`
 - [x] `codex` target 实现
-- [x] TUI 顶部 `[Claude] [Codex]` tab 风格标识 + target 切换入口
+- [x] Ratatui inline viewport 双列 TUI，真实 tabs + 双列 target/profile 切换
 
 ## Implementation Order
 
@@ -34,7 +34,7 @@
 - [x] **Feature 1: `ccrl check`** — Connectivity check command
 - [x] **Feature 2: Notes/Description field** — Optional `description` field in profiles, shown in `ccrl list` output.
 - [x] **Feature 3: Shell completions** — `ccrl completions <shell>` generates completions via `clap_complete`. that tests each profile's API endpoint (`/v1/models`) and reports status with timing. Usage: `ccrl check` or `ccrl check <profile-name>`.
-- [x] **Feature 5: Interactive Profile Selector** — `ccrl` with no args shows `dialoguer::Select` inline picker (arrow keys + Enter). TTY check falls back to help for non-interactive shells. Escape/Ctrl-C exits cleanly.
+- [x] **Feature 5: Interactive Profile Selector** — `ccrl` with no args shows a Ratatui inline viewport TUI with dual columns for Claude/Codex. `Tab` and `Left/Right` switch focus columns; `j/k` and `Up/Down` move within the focused column; `Enter` activates the focused profile; `Esc`/`q`/`Ctrl-C` exits cleanly.
 - [x] **Feature 6: Per-profile color** — `color` field in config supports named colors and hex (`#RRGGBB` / `#RGB`). `parse_hex_color()` utility in `config.rs` parses hex strings without new deps; `apply_color()` in `main.rs` uses `owo-colors` `.truecolor(r,g,b)` for RGB output.
 
 ## Completed Fixes
@@ -50,7 +50,7 @@
 - 新增 `--target claude|codex` 全局选项
 - 新增 `claude.toml` / `codex.toml` 双配置文件布局
 - `.current` 记录 target + profile，而不是单纯 profile
-- TUI 顶部显示 `[Claude] [Codex]` tab 风格标识，并通过列表入口切换 target
+- TUI 使用真实 tabs 和双列列表，不再通过伪列表项切换 target
 
 ## Future Features
 
@@ -154,4 +154,4 @@ Completes: subcommand names + profile names for `set`/`check`/`validate` args
 - `codex` syncs `model_provider` and `[model_providers.*]` into `~/.codex/config.toml`
 - `codex` rewrites `~/.codex/auth.json` for API-key profiles
 - `codex` exposes a synthetic `OAuth` entry backed by a managed OAuth auth snapshot
-- Interactive mode uses a stable inline picker with a `[Claude] [Codex]` target header and a `Switch target` entry
+- Interactive mode uses Ratatui inline viewport with dual columns, persistent per-column selection, and true tab focus switching

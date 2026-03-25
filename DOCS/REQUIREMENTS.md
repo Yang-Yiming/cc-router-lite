@@ -121,12 +121,15 @@ mode = "oauth"
 ### `ccrl` (no args, interactive)
 
 进入 TUI：
-- 顶部 prompt 显示 `[Claude] [Codex]` 的 tab 风格标签，突出当前 target
-- 当前版本先按选定 target 显示对应 profiles
-- 列表第一项为 `Switch target`
-- `codex` target 会额外显示一个 synthetic 选项 `OAuth`
-- `Enter` 激活选中的 profile
-- `Esc` / `Ctrl-C` 退出
+- 使用 Ratatui inline viewport，在当前终端内联渲染，不切 alternate screen
+- 顶部显示真实 `[Claude] [Codex]` tabs，反映当前焦点 target
+- 主体为双列列表：左列 `Claude`，右列 `Codex`
+- `codex` 列额外显示一个 synthetic 选项 `OAuth`
+- `Tab` / `Left` / `Right` 切换焦点列
+- `j` / `k` / `Up` / `Down` 在焦点列内移动
+- `Enter` 激活焦点列当前选中的 profile
+- 两列都显示各自当前 active profile 标记
+- `Esc` / `q` / `Ctrl-C` 退出
 
 ## Constraints
 

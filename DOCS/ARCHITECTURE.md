@@ -17,6 +17,7 @@ cc-router-lite/
     ├── config.rs     # 全局配置 + target profile 解析、~ 展开
     ├── settings.rs   # target settings 写入与 env 注入
     ├── state.rs      # .current 活跃 target/profile 追踪
+    ├── tui.rs        # Ratatui inline viewport 双列交互 UI
     └── error.rs      # 统一错误类型 CcrlError
 ```
 
@@ -30,8 +31,8 @@ cc-router-lite/
 | `serde_json` (1) | settings.json 操作 |
 | `dirs` (5) | 跨平台 home 目录解析 |
 | `thiserror` (2) | 错误类型派生 |
-
-| `dialoguer` (0.12) | 交互式 profile 选择器 |
+| `ratatui` (0.29) | inline viewport TUI 渲染 |
+| `crossterm` (0.28) | 键盘事件与终端控制 |
 
 无 async 依赖 — 所有操作都是本地文件读写，同步即可。
 
@@ -186,15 +187,22 @@ enum Commands {
 1. 检测 stdin/stdout 是否 TTY
 2. 非 TTY → 输出 help
 3. TTY → load_global_config(), read_current()
-4. 当前版本根据 `--target`、`.current` 或 `default_target` 确定 target
-5. 根据当前 target 加载对应 profiles
-6. 构建 display items，首项是 `Switch target`
-7. prompt 显示 `[Claude] [Codex]` tab 风格标签，突出当前 target
-8. `dialoguer::Select` 交互选择
-9. Escape/Ctrl-C → 静默退出
-10. 选择切换项时切换 target 并重绘列表
-11. 选择 profile 后 → 委托 `cmd_set()` 激活 profile
+4. 根据 `--target`、`.current` 或 `default_target` 确定初始焦点 target
+5. 同时加载 `claude.toml` 和 `codex.toml`，为双列视图构建 items
+6. 从 `~/.claude/settings.json` 与 `~/.codex/{config,auth}.json` 推断两侧 active profile
+7. 启动 `ratatui` inline viewport，渲染顶部 tabs、双列 lists、底部 help
+8. `Tab`/`Left`/`Right` 切换焦点列；`j/k`/`Up/Down` 只移动焦点列选中项
+9. Escape/q/Ctrl-C → 静默退出
+10. Enter 返回焦点列选中的 profile
+11. `main.rs` 委托 `cmd_set()` 激活 profile
 ```
+
+### `tui.rs` — 双列交互状态机
+
+- `TuiApp` 持有 `focused_target` 以及 Claude/Codex 两列各自的 items 与 selected index
+- 两列 selection 独立持久化，切焦点时不会丢失另一列游标
+- `Tabs` 仅表达当前焦点 target；真正的数据浏览通过双列 `List` 完成
+- `TuiSelection { target, profile }` 作为 UI 与命令层之间的返回值
 
 ### `ccrl set <name>`
 

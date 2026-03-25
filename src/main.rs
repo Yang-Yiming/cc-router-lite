@@ -3,6 +3,7 @@ mod config;
 mod error;
 mod settings;
 mod state;
+mod tui;
 
 use std::collections::{HashMap, HashSet};
 use std::io::{self, IsTerminal};
@@ -12,8 +13,8 @@ use std::process;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::Shell;
 use console::style;
-use dialoguer::Select;
 use owo_colors::OwoColorize;
+use serde_json::Value as JsonValue;
 
 use crate::codex::OAUTH_PROFILE_NAME;
 use crate::config::{
@@ -22,6 +23,7 @@ use crate::config::{
 };
 use crate::error::CcrlError;
 use crate::state::CurrentState;
+use crate::tui::TuiProfileItem;
 
 #[derive(Parser)]
 #[command(name = "ccrl", about = "Codex/Claude Code Router Lite")]
@@ -221,72 +223,123 @@ fn current_display_name(current: &CurrentState) -> &str {
     }
 }
 
-fn tab_label(active_target: Target) -> String {
-    match active_target {
-        Target::Claude => format!("{} {}", "[Claude]".green().bold(), "[Codex]".dimmed()),
-        Target::Codex => format!("{} {}", "[Claude]".dimmed(), "[Codex]".green().bold()),
+fn load_profiles_for_tui(
+    custom_config: &Option<PathBuf>,
+    target: Target,
+) -> Result<HashMap<String, RawProfile>, CcrlError> {
+    match load_profiles(&profiles_path(custom_config, target)) {
+        Ok(profiles) => Ok(profiles),
+        Err(CcrlError::ConfigNotFound(_)) => Ok(HashMap::new()),
+        Err(err) => Err(err),
     }
 }
 
-fn interactive_items(
+fn active_claude_profile_name(
+    profiles: &HashMap<String, RawProfile>,
+) -> Result<Option<String>, CcrlError> {
+    let path = claude_settings_path();
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let content = std::fs::read_to_string(path)?;
+    let root: JsonValue = serde_json::from_str(&content)?;
+    let Some(env) = root.get("env").and_then(|value| value.as_object()) else {
+        return Ok(None);
+    };
+
+    let base_url = env
+        .get("ANTHROPIC_BASE_URL")
+        .and_then(|value| value.as_str());
+    let auth = env
+        .get("ANTHROPIC_AUTH_TOKEN")
+        .and_then(|value| value.as_str());
+
+    for name in sorted_profile_names(profiles) {
+        let profile = resolve_profile(&name, &profiles[&name])?;
+        if base_url != Some(profile.url.as_str()) || auth != Some(profile.auth.as_str()) {
+            continue;
+        }
+
+        let env_matches = profile
+            .env
+            .iter()
+            .all(|(key, value)| env.get(key) == Some(value));
+        if env_matches {
+            return Ok(Some(name));
+        }
+    }
+
+    Ok(None)
+}
+
+fn active_codex_profile_name(
+    profiles: &HashMap<String, RawProfile>,
+) -> Result<Option<String>, CcrlError> {
+    if codex::current_auth_is_oauth(&codex::codex_auth_path())? {
+        return Ok(Some(OAUTH_PROFILE_NAME.to_string()));
+    }
+
+    let Some(provider) = codex::current_model_provider(&codex::codex_config_path())? else {
+        return Ok(None);
+    };
+
+    if profiles.contains_key(&provider) {
+        Ok(Some(provider))
+    } else {
+        Ok(None)
+    }
+}
+
+fn sorted_profile_names(profiles: &HashMap<String, RawProfile>) -> Vec<String> {
+    let mut names: Vec<String> = profiles.keys().cloned().collect();
+    names.sort();
+    names
+}
+
+fn build_tui_items(
     target: Target,
     profiles: &HashMap<String, RawProfile>,
-    current: Option<&CurrentState>,
-) -> Result<(Vec<String>, Vec<String>), CcrlError> {
-    let mut ids = Vec::new();
+    active_profile: Option<&str>,
+) -> Result<Vec<TuiProfileItem>, CcrlError> {
     let mut items = Vec::new();
-
-    ids.push("__switch_target__".to_string());
-    items.push(format!(
-        "{} {}",
-        style(">").cyan(),
-        style("Switch target").dim()
-    ));
 
     match target {
         Target::Claude => {
-            let mut names: Vec<&String> = profiles.keys().collect();
-            names.sort();
-            for name in names {
-                let profile = resolve_profile(name, &profiles[name])?;
-                let active =
-                    current.as_ref().map(|c| current_display_name(c)) == Some(name.as_str());
-                ids.push(name.to_string());
-                items.push(format_profile_item(
+            for name in sorted_profile_names(profiles) {
+                let profile = resolve_profile(&name, &profiles[&name])?;
+                items.push(TuiProfileItem {
                     name,
-                    profile.description.as_deref(),
-                    profile.color.as_deref(),
-                    active,
-                ));
+                    description: profile.description,
+                    color: profile.color,
+                    active: active_profile == Some(profile.name.as_str()),
+                });
             }
         }
         Target::Codex => {
             maybe_refresh_codex_oauth_snapshot()?;
             for name in codex_entries(profiles) {
-                let active =
-                    current.as_ref().map(|c| current_display_name(c)) == Some(name.as_str());
-                ids.push(name.clone());
                 if name == OAUTH_PROFILE_NAME {
-                    items.push(format_profile_item(
-                        &name,
-                        Some("Restore saved OAuth auth"),
-                        Some("magenta"),
-                        active,
-                    ));
+                    items.push(TuiProfileItem {
+                        name,
+                        description: Some("Restore saved OAuth auth".to_string()),
+                        color: Some("magenta".to_string()),
+                        active: active_profile == Some(OAUTH_PROFILE_NAME),
+                    });
                 } else {
                     let profile = resolve_profile(&name, &profiles[&name])?;
-                    items.push(format_profile_item(
-                        &name,
-                        profile.description.as_deref(),
-                        profile.color.as_deref(),
-                        active,
-                    ));
+                    items.push(TuiProfileItem {
+                        name,
+                        description: profile.description,
+                        color: profile.color,
+                        active: active_profile == Some(profile.name.as_str()),
+                    });
                 }
             }
         }
     }
 
-    Ok((ids, items))
+    Ok(items)
 }
 
 fn cmd_set(
@@ -513,7 +566,7 @@ fn cmd_interactive(
     custom_config: &Option<PathBuf>,
     explicit_target: Option<Target>,
 ) -> Result<(), CcrlError> {
-    let mut target = if let Some(target) = explicit_target {
+    let target = if let Some(target) = explicit_target {
         target
     } else if let Some(current) = state::read_current() {
         current.target
@@ -521,45 +574,19 @@ fn cmd_interactive(
         selected_target(custom_config, None)?
     };
 
-    loop {
-        let profiles = load_profiles(&profiles_path(custom_config, target))?;
-        let current = current_state_for_target(target);
-        let (ids, items) = interactive_items(target, &profiles, current.as_ref())?;
+    let claude_profiles = load_profiles_for_tui(custom_config, Target::Claude)?;
+    let codex_profiles = load_profiles_for_tui(custom_config, Target::Codex)?;
+    let claude_active = active_claude_profile_name(&claude_profiles)?;
+    let codex_active = active_codex_profile_name(&codex_profiles)?;
 
-        let default = current
-            .as_ref()
-            .and_then(|c| {
-                let current_name = current_display_name(c);
-                ids.iter().position(|id| id == current_name)
-            })
-            .unwrap_or(1.min(items.len().saturating_sub(1)));
+    let claude_items = build_tui_items(Target::Claude, &claude_profiles, claude_active.as_deref())?;
+    let codex_items = build_tui_items(Target::Codex, &codex_profiles, codex_active.as_deref())?;
 
-        let selection = Select::new()
-            .with_prompt(format!(
-                "{}  {}",
-                tab_label(target),
-                style("Choose profile").cyan()
-            ))
-            .items(&items)
-            .default(default)
-            .interact_opt()
-            .map_err(|e| CcrlError::Io(e.into()))?;
-
-        let Some(index) = selection else {
-            return Ok(());
-        };
-
-        let selected = &ids[index];
-        if selected == "__switch_target__" {
-            target = match target {
-                Target::Claude => Target::Codex,
-                Target::Codex => Target::Claude,
-            };
-            continue;
-        }
-
-        return cmd_set(custom_config, Some(target), selected);
+    if let Some(selection) = tui::run(target, claude_items, codex_items)? {
+        cmd_set(custom_config, Some(selection.target), &selection.profile)?;
     }
+
+    Ok(())
 }
 
 fn cmd_export(

@@ -64,10 +64,17 @@ pub fn read_current() -> Option<CurrentState> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
     use tempfile::tempdir;
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn test_write_read_current() {
+        let _guard = env_lock().lock().unwrap();
         let dir = tempdir().unwrap();
         std::env::set_var("HOME", dir.path());
         std::env::set_var("XDG_CONFIG_HOME", dir.path().join(".config"));
@@ -83,6 +90,7 @@ mod tests {
 
     #[test]
     fn test_read_current_missing() {
+        let _guard = env_lock().lock().unwrap();
         let dir = tempdir().unwrap();
         std::env::set_var("HOME", dir.path());
         std::env::set_var("XDG_CONFIG_HOME", dir.path().join(".config"));

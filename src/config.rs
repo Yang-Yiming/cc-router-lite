@@ -181,6 +181,12 @@ pub fn resolve_profile(name: &str, raw: &RawProfile) -> Result<Profile, CcrlErro
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn test_parse_hex_color() {
@@ -202,12 +208,14 @@ mod tests {
 
     #[test]
     fn test_resolve_value_env_var() {
+        let _guard = env_lock().lock().unwrap();
         std::env::set_var("TEST_VAR", "test_value");
         assert_eq!(resolve_value("$TEST_VAR").unwrap(), "test_value");
     }
 
     #[test]
     fn test_resolve_value_missing_env() {
+        let _guard = env_lock().lock().unwrap();
         std::env::remove_var("MISSING_VAR");
         assert!(matches!(
             resolve_value("$MISSING_VAR"),
@@ -217,6 +225,7 @@ mod tests {
 
     #[test]
     fn test_resolve_profile() {
+        let _guard = env_lock().lock().unwrap();
         std::env::set_var("TEST_AUTH", "sk-test");
         let raw = RawProfile {
             url: "https://api.test.com".into(),
