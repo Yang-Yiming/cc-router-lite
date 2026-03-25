@@ -2,24 +2,22 @@
 
 A lightweight CLI for switching between multiple API profiles behind a target-aware interface.
 
-This project is inspired by [Claude Code Router](https://github.com/musistudio/claude-code-router), a powerful routing solution with many features. Unlike it, this project only focuses on being extremely lightweight, operating only by injecting environment variables into `~/.claude/settings.json`.
+This project is inspired by [Claude Code Router](https://github.com/musistudio/claude-code-router), a powerful routing solution with many features. Unlike it, this project only focuses on being extremely lightweight, operating only by injecting environment variables into `~/.claude/settings.json`(claude) and `~/.codex/settings.toml & auth.json`(codex).
 
 Current status:
 - `claude` target is implemented
 - `codex` target is implemented with provider sync and OAuth restore
-- interactive mode uses a stable `dialoguer` picker with a tab-style target header
+- interactive mode uses a stable [ratatui](https://github.com/ratatui/ratatui) picker.
 
 ## Features
 
-- Switch profiles by injecting env vars into `~/.claude/settings.json`
-- Export env vars to the current shell session via `eval`
+- Switch profiles by injecting env vars into config files.
 - Track the active profile across sessions
-- Support `$ENV_VAR` references in config values
-- Validate profiles (env var resolution) without network calls
+- Validate profiles (env var resolution) without network calls.
 - Check API connectivity for all profiles
 
 >[!warning]
->env vars(containing api-keys) are injected into `~/.claude/settings.json` directly, make sure this file not uploaded to git repos.
+>env vars(containing api-keys) are injected into `~/.claude/settings.json` and `~/.codex/auth.json` directly, make sure these files not uploaded to git repos.
 
 ## Install
 
@@ -57,7 +55,7 @@ ANTHROPIC_SMALL_FAST_MODEL="deepseek-chat"
 [kimi]
 url = "https://api.moonshot.cn/anthropic/"
 auth = "sk-xxxx"
-color = "yellow"
+color = "#1E4D8F"
 description = "Kimi API"
 ```
 
@@ -65,28 +63,30 @@ Create `~/.config/ccr-lite/codex.toml`:
 
 ```toml
 [fox]
-url = "https://code.newcli.com/codex/v1"
-auth = "$FOX_API_KEY"
+url = "https://..."
+auth = "sk-xxxx"
 color = "red"
-description = "Fox"
-wire_api = "responses"
-requires_openai_auth = true
+description = "test"
 ```
 
 **Optional fields:**
-- `color` — Display color in list/interactive mode. Supported: `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `black`
+- `color` — Display color in list/interactive mode. Supported: `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `black` and `#RRGGBB`
 - `description` — Short description shown in profile lists
 - `wire_api` — Codex provider `wire_api`, defaults to `responses`
 - `requires_openai_auth` — Codex provider flag, defaults to `true`
 
 ## Usage
 
+### TUI interface (Recommend for humans)
+```sh
+ccrl
+```
+
+### CLI commands
+
 ```sh
 # Inject a Claude profile into ~/.claude/settings.json (persistent)
 ccrl --target claude set ds
-
-# Open the interactive picker
-ccrl
 
 # Show the active target/profile
 ccrl now
@@ -104,7 +104,7 @@ ccrl --target claude check
 eval "$(ccrl --target claude ds)"
 
 # Activate a Codex provider and rewrite ~/.codex/config.toml + ~/.codex/auth.json
-ccrl --target codex set fox
+ccrl --target codex set test
 
 # Restore saved Codex OAuth auth and clear model_provider
 ccrl --target codex set OAuth
@@ -112,7 +112,8 @@ ccrl --target codex set OAuth
 >[!note]
 >Environment variable settings (e.g., `eval "$(ccrl ds)"`) have lower priority than `~/.claude/settings.json` in Claude Code. If a provider is already configured there, the environment >variable will be ignored.
 
-Interactive mode notes:
-- The prompt shows a `Claude` / `Codex` tab-style header for the current target.
-- The first list item switches target.
-- Arrow keys select a profile, `Enter` activates it, `Esc` or `Ctrl-C` exits.
+---
+
+# License
+
+MIT
