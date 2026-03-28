@@ -6,31 +6,38 @@ on:
       - "v*"
 
 jobs:
-  build-macos-arm:
-    name: Build macOS ARM
-    runs-on: macos-14
+  build-release:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS ARM
+            runner: macos-14
+            target: aarch64-apple-darwin
+          - name: Linux x86_64
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin
+          targets: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release --target aarch64-apple-darwin
+        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package
         run: |
-          cd target/aarch64-apple-darwin/release
-          tar czf ccrl-aarch64-apple-darwin.tar.gz ccrl
-          shasum -a 256 ccrl-aarch64-apple-darwin.tar.gz > ccrl-aarch64-apple-darwin.tar.gz.sha256
+          cd target/${{ matrix.target }}/release
+          tar czf ccrl-${{ matrix.target }}.tar.gz ccrl
 
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            target/aarch64-apple-darwin/release/ccrl-aarch64-apple-darwin.tar.gz
-            target/aarch64-apple-darwin/release/ccrl-aarch64-apple-darwin.tar.gz.sha256
+          files: target/${{ matrix.target }}/release/ccrl-${{ matrix.target }}.tar.gz
