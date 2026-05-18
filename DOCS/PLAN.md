@@ -40,6 +40,7 @@
 ## Completed Fixes
 
 - [x] **Stale env key cleanup on profile switch** — `inject_profile()` now removes old profile's env keys before injecting new ones, using `.current` state to identify the previous profile. Old profile missing or `.current` absent gracefully skips removal.
+- [x] **GitHub release workflow now publishes Linux builds** — `.github/workflows/release.yml` now builds both `aarch64-apple-darwin` and `x86_64-unknown-linux-gnu` release tarballs from the same matrix job, and no longer generates separate `.sha256` files.
 
 ## Design Changes from Original Requirements
 

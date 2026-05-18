@@ -1,5 +1,8 @@
 # ccrl — Codex/Claude Code Router Lite
 
+>[!note]
+>The Repo is no longer maintained as [cc-switch](https://github.com/farion1231/cc-switch) would be a much better choice. But contributions are still welcome.
+
 A lightweight CLI for switching between multiple API profiles behind a target-aware interface.
 
 This project is inspired by [Claude Code Router](https://github.com/musistudio/claude-code-router), a powerful routing solution with many features. Unlike it, this project only focuses on being extremely lightweight, operating only by injecting environment variables into `~/.claude/settings.json`(claude) and `~/.codex/settings.toml & auth.json`(codex).

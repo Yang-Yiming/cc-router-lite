@@ -137,3 +137,8 @@ mode = "oauth"
 - 修改目标 settings 时必须保留已有字段
 - settings 文件可能没有 `env` 字段，需要自动创建
 - 支持 `--config` 全局选项指定非默认全局配置文件路径
+
+## Release Packaging
+
+- GitHub tag release workflow should publish packaged binaries for macOS Apple Silicon and Linux x86_64
+- Release assets only need the binary archives themselves; no separate SHA256 sidecar file is required

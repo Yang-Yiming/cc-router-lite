@@ -36,6 +36,14 @@ cc-router-lite/
 
 无 async 依赖 — 所有操作都是本地文件读写，同步即可。
 
+## Release Automation
+
+- GitHub Actions release workflow lives at `.github/workflows/release.yml`
+- Tag pushes matching `v*` produce release tarballs for:
+  - `aarch64-apple-darwin`
+  - `x86_64-unknown-linux-gnu`
+- The workflow uploads only the packaged archives; standalone `.sha256` sidecar files are intentionally not generated
+
 ## Data Structures
 
 ### `error.rs` — 统一错误类型
